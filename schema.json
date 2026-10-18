@@ -1,0 +1,95 @@
+[
+  {
+    "@context": "https://schema.org",
+    "@type": "FinancialService",
+    "@id": "https://www.studyleap.in/#corporate",
+    "name": "Study LEAP \u2013 Education Loan Consultant",
+    "alternateName": ["Study LEAP", "Study LEAP India", "Study LEAP Education Loans"],
+    "image": ["https://www.studyleap.in/og-image.jpg"],
+    "logo": "https://www.studyleap.in/logo.png",
+    "url": "https://www.studyleap.in",
+    "sameAs": ["https://www.facebook.com/profile.php?id=61590689732654", "https://www.instagram.com/studyleapeducationloan/"],
+    "telephone": "+918837693510",
+    "email": "support@studyleap.in",
+    "currenciesAccepted": "INR",
+    "paymentAccepted": "Cash, Bank Transfer, UPI, NEFT",
+    "priceRange": "Free Consultation",
+    "openingHoursSpecification": {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
+      "opens": "09:00",
+      "closes": "19:00"
+    },
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "SCO No 5, Behind New Bus Stand",
+      "addressLocality": "Barnala",
+      "addressRegion": "Punjab",
+      "postalCode": "148101",
+      "addressCountry": "IN"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 30.3747115,
+      "longitude": 75.5374386
+    },
+    "areaServed": [
+      {"@type": "Country", "name": "India"},
+      {"@type": "City", "name": "Barnala"},
+      {"@type": "State", "name": "Punjab"}
+    ],
+    "serviceType": [
+      "Education Loan Consulting",
+      "International Education Loan",
+      "Domestic Education Loan",
+      "Documentation Assistance",
+      "Scholarship Guidance",
+      "Forex Remittance",
+      "Loan Insurance",
+      "EMI Calculation",
+      "Bank Comparison"
+    ],
+    "description": "Study LEAP is a trusted education loan consultant in Barnala, Punjab offering free consultation for domestic and international education loans. We compare rates across 8+ lending partners to get you the best deal.",
+    "hasOfferCatalog": {
+      "@type": "OfferCatalog",
+      "name": "Education Loan Services",
+      "itemListElement": [
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "USA Education Loan", "url": "https://www.studyleap.in/education-loan-usa/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Canada Education Loan", "url": "https://www.studyleap.in/education-loan-canada/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "UK Education Loan", "url": "https://www.studyleap.in/education-loan-uk/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Australia Education Loan", "url": "https://www.studyleap.in/education-loan-australia/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Germany Education Loan", "url": "https://www.studyleap.in/education-loan-germany/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "IIT Education Loan", "url": "https://www.studyleap.in/education-loan-for-iit/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "MBBS Education Loan", "url": "https://www.studyleap.in/education-loan-for-mbbs/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Education Loan Without Collateral", "url": "https://www.studyleap.in/education-loan-without-collateral/"}}
+      ]
+    }
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": "https://www.studyleap.in/#website",
+    "url": "https://www.studyleap.in",
+    "name": "Study LEAP",
+    "description": "India's trusted education loan consultant \u2014 free guidance for domestic and international education loans.",
+    "publisher": {"@id": "https://www.studyleap.in/#corporate"},
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {"@type": "EntryPoint", "urlTemplate": "https://www.studyleap.in/?s={search_term_string}"},
+      "query-input": "required name=search_term_string"
+    }
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "@id": "https://www.studyleap.in/#breadcrumb",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "https://www.studyleap.in/"
+      }
+    ]
+  }
+]

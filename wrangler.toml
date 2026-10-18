@@ -1,0 +1,54 @@
+# ── Study LEAP — Cloudflare Worker Configuration ─────────────────────────
+# Architecture:
+#   - studyleap.in        → cPanel (serves static files)
+#   - Cloudflare Worker      → handles form API, notifications, D1 leads
+#   - GitHub                 → code storage / Worker auto-deploy
+#
+# Deploy: git push to GitHub → auto-deploys to studyleap-form-handler Worker
+# Local:  wrangler dev
+
+name = "studyleap-form-handler"
+main = "worker.js"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ── D1 Database Binding ────────────────────────────────────────────────────
+# database_id below is a PLACEHOLDER. Run `wrangler d1 create studyleap-leads`
+# in your own Cloudflare account first, then paste the real ID it gives you here.
+[[d1_databases]]
+binding = "DB"
+database_name = "studyleap-leads"
+database_id = "c2be1e1c-29de-4b5e-b8b1-6cb592d00e42"
+
+# ── Cron Trigger (Follow-up reminders every 30 min) ───────────────────────
+[triggers]
+crons = ["*/30 * * * *"]
+
+# ── Secrets (add via Dashboard → studyleap-form-handler → Settings) ────
+#
+#  Variable (plain text) — these are EXAMPLE FORMATS ONLY, not real values.
+#  Fill in your own from each service's dashboard:
+#   WHATSAPP_PHONE_ID             = (from Meta Business Suite → WhatsApp → API Setup)
+#   WHATSAPP_RECIPIENTS           = 918837693510   (add more, comma-separated, if needed)
+#   TELEGRAM_CHAT_ID              = (from your Telegram bot — message it, then check getUpdates)
+#   EMAILJS_SERVICE_ID            = (from EmailJS account page)
+#   EMAILJS_TEMPLATE_ID           = (from EmailJS account page)
+#   EMAILJS_AUTOREPLY_TEMPLATE_ID = (from EmailJS account page)
+#   EMAILJS_PUBLIC_KEY            = (from EmailJS account page)
+#   INDEXNOW_KEY                  = a43564061a204f628c53dbad80fe566e
+#
+#  Secret (encrypted):
+#   WHATSAPP_TOKEN                = (Meta permanent system user token)
+#   EMAILJS_PRIVATE_KEY           = (from EmailJS account page)
+#   TELEGRAM_BOT_TOKEN            = (from @BotFather)
+#   CRM_SECRET                    = (min 16 chars random string)
+#   TURNSTILE_SECRET              = (from Cloudflare Turnstile dashboard)
+#   GOOGLE_PLACES_KEY             = (from Google Cloud Console)
+
+# ── Observability (Cloudflare suggested — enables real-time logs) ──────────
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
