@@ -18,7 +18,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "studyleap-leads"
-database_id = "c2be1e1c-29de-4b5e-b8b1-6cb592d00e42"
+database_id = "3cb6c907-0c75-4b79-b792-af9095797775"
 
 # ── Cron Trigger (Follow-up reminders every 30 min) ───────────────────────
 [triggers]
