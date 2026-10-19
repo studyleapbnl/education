@@ -6,6 +6,11 @@
 // ══════════════════════════════════════════
 const WORKER_URL = 'https://education.studyleapbnl.workers.dev';
 
+// ── Cloudflare Turnstile (spam protection) ────────────────────────────────
+// Site key of the Study LEAP widget (Cloudflare -> Turnstile). The matching SECRET key
+// must be added to the Worker as TURNSTILE_SECRET. Set this to '' to switch the check off.
+const TURNSTILE_SITE_KEY = '0x4AAAAAAFbX4UwSRUQCpF2o';
+
 // ── GA4 Form Funnel Tracking ──────────────────────────────────────────────
 function gaEvent(name, params = {}) {
   if (typeof gtag === 'function') gtag('event', name, params);
@@ -363,18 +368,20 @@ function whenTurnstileReady(cb, attempts = 0) {
   if (attempts > 100) return; // ~10s ceiling, give up quietly
   setTimeout(() => whenTurnstileReady(cb, attempts + 1), 100);
 }
-whenTurnstileReady(() => {
+if (TURNSTILE_SITE_KEY) whenTurnstileReady(() => {
   turnstileApiReady = true;
   const cEl = document.getElementById('c-turnstile');
   if (cEl && cTurnstileWidgetId === null) {
-    cTurnstileWidgetId = turnstile.render('#c-turnstile', { sitekey: '0x4AAAAAADRo6pr77mGNNfnG', theme: 'light' });
+    cTurnstileWidgetId = turnstile.render('#c-turnstile', { sitekey: TURNSTILE_SITE_KEY, theme: 'light' });
   }
   if (heroStep === 3) renderHeroTurnstile();
+  const pEl = document.getElementById('p-turnstile');
+  if (pEl && !pEl.hasChildNodes()) turnstile.render('#p-turnstile', { sitekey: TURNSTILE_SITE_KEY, theme: 'light' });
 });
 function renderHeroTurnstile() {
   if (!turnstileApiReady || hTurnstileWidgetId !== null) return;
   const hEl = document.getElementById('h-turnstile');
-  if (hEl) hTurnstileWidgetId = turnstile.render('#h-turnstile', { sitekey: '0x4AAAAAADRo6pr77mGNNfnG', theme: 'light' });
+  if (hEl) hTurnstileWidgetId = turnstile.render('#h-turnstile', { sitekey: TURNSTILE_SITE_KEY, theme: 'light' });
 }
 
 // ── Hero Form Submit ──

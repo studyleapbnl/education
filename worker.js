@@ -304,6 +304,13 @@ export default {
     // /path/ → /path/index.html, serves robots.txt, sitemap.xml, images, etc.
     // Google Maps API key is injected into every HTML response (not just '/').
     if (method === 'GET') {
+      // API-only deployment: the static site is hosted separately (Cloudflare Pages),
+      // so there is no ASSETS binding. Answer health checks instead of crashing (Error 1101).
+      if (!env.ASSETS) {
+        if (url.pathname === '/' || url.pathname === '/health')
+          return json({ ok: true, service: 'Study LEAP form API', status: 'running' }, 200, origin);
+        return json({ ok: false, error: 'Not found' }, 404, origin);
+      }
       const response = await env.ASSETS.fetch(request);
       const contentType = response.headers.get('content-type') || '';
 
