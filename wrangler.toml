@@ -13,8 +13,8 @@ compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
 
 # ── D1 Database Binding ────────────────────────────────────────────────────
-# database_id below is a PLACEHOLDER. Run `wrangler d1 create studyleap-leads`
-# in your own Cloudflare account first, then paste the real ID it gives you here.
+# Database: studyleap-leads (new Cloudflare account). Tables are created by running
+# schema.sql once in Cloudflare -> D1 -> studyleap-leads -> Console.
 [[d1_databases]]
 binding = "DB"
 database_name = "studyleap-leads"
