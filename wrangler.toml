@@ -4,13 +4,14 @@
 #   - Cloudflare Worker      → handles form API, notifications, D1 leads
 #   - GitHub                 → code storage / Worker auto-deploy
 #
-# Deploy: git push to GitHub → auto-deploys to studyleap-form-handler Worker
+# Deploy: git push to GitHub → auto-deploys to the "education" Worker
 # Local:  wrangler dev
 
-name = "studyleap-form-handler"
+name = "education"
 main = "worker.js"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
 
 # ── D1 Database Binding ────────────────────────────────────────────────────
 # Database: studyleap-leads (new Cloudflare account). Tables are created by running
@@ -24,7 +25,7 @@ database_id = "3cb6c907-0c75-4b79-b792-af9095797775"
 [triggers]
 crons = ["*/30 * * * *"]
 
-# ── Secrets (add via Dashboard → studyleap-form-handler → Settings) ────
+# ── Secrets (add via Dashboard → education → Settings) ────
 #
 #  Variable (plain text) — these are EXAMPLE FORMATS ONLY, not real values.
 #  Fill in your own from each service's dashboard:

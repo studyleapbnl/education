@@ -4,7 +4,7 @@
 //  Worker as encrypted secrets — nothing
 //  secret is present in this file.
 // ══════════════════════════════════════════
-const WORKER_URL = 'https://studyleap-form-handler.studyleapbnl.workers.dev';
+const WORKER_URL = 'https://education.studyleapbnl.workers.dev';
 
 // ── GA4 Form Funnel Tracking ──────────────────────────────────────────────
 function gaEvent(name, params = {}) {
