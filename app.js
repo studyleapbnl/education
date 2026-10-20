@@ -375,8 +375,6 @@ if (TURNSTILE_SITE_KEY) whenTurnstileReady(() => {
     cTurnstileWidgetId = turnstile.render('#c-turnstile', { sitekey: TURNSTILE_SITE_KEY, theme: 'light' });
   }
   if (heroStep === 3) renderHeroTurnstile();
-  const pEl = document.getElementById('p-turnstile');
-  if (pEl && !pEl.hasChildNodes()) turnstile.render('#p-turnstile', { sitekey: TURNSTILE_SITE_KEY, theme: 'light' });
 });
 function renderHeroTurnstile() {
   if (!turnstileApiReady || hTurnstileWidgetId !== null) return;

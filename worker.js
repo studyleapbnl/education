@@ -468,7 +468,12 @@ async function handleFormSubmit(request, env, origin) {
     return json({ ok: true, id: uid(), errors: [] }, 200, origin);
 
   // ── 2. Turnstile ──────────────────────────────────────────────────────────
-  const tsResult = await verifyTurnstile(turnstileToken, env.TURNSTILE_SECRET, clientIP);
+  // Forms that show the Turnstile box always send a token, and it is verified.
+  // Inner-page forms have no box yet, so a missing token is accepted unless the
+  // Worker variable TURNSTILE_REQUIRED is set to "true" (strict mode).
+  const tsResult = (!turnstileToken && env.TURNSTILE_REQUIRED !== 'true')
+    ? { success: true, skipped: true }
+    : await verifyTurnstile(turnstileToken, env.TURNSTILE_SECRET, clientIP);
   if (!tsResult.success) {
     console.warn('Turnstile failed:', tsResult['error-codes'] || tsResult.error);
     return json({ ok: false, errors: ['Security check failed. Please refresh and try again.'] }, 403, origin);

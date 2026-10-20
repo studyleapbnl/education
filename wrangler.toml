@@ -37,6 +37,8 @@ crons = ["*/30 * * * *"]
 #   EMAILJS_AUTOREPLY_TEMPLATE_ID = (from EmailJS account page)
 #   EMAILJS_PUBLIC_KEY            = (from EmailJS account page)
 #   INDEXNOW_KEY                  = a43564061a204f628c53dbad80fe566e
+#   TURNSTILE_REQUIRED            = (optional) "true" = reject forms that send no Turnstile token.
+#                                   Leave unset until every page's form shows the Turnstile box.
 #
 #  Secret (encrypted):
 #   WHATSAPP_TOKEN                = (Meta permanent system user token)
