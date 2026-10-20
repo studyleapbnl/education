@@ -343,7 +343,7 @@ function testUpload() {
     fileName: 'test_file.txt',
     mimeType: 'text/plain',
     // "Hello Study LEAP Test" in base64
-    data:    'SGVsbG8gU3R1ZHlDYXBpdGFsIFRlc3Q=',
+    data:    'SGVsbG8gU3R1ZHkgTEVBUCBUZXN0',
     studentInfo: { name: 'Test Student', phone: '9999999999',
                    email: 'test@test.com', course: 'Test',
                    college: 'Test College', amount: 'Test' }
