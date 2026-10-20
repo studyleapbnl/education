@@ -9,7 +9,7 @@
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#ffffff",
-  "theme_color": "#0E6B5C",
+  "theme_color": "#0048A8",
   "lang": "en-IN",
   "dir": "ltr",
   "icons": [

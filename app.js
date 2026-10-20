@@ -162,7 +162,7 @@ function showFormError(containerId, name, phone) {
           💬 WhatsApp Us
         </a>
         <a href="tel:+918837693510"
-          style="background:#0E6B5C;color:#fff;padding:7px 14px;border-radius:6px;
+          style="background:#0048A8;color:#fff;padding:7px 14px;border-radius:6px;
                  text-decoration:none;font-weight:600;font-size:13px;">
           📞 Call Now
         </a>

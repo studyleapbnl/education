@@ -3,7 +3,7 @@
       var API_KEY  = ''; // 🔐 REMOVED: Set this via server-side injection or environment variable — never hardcode here
       var PLACE_ID = ''; // TODO(Study LEAP): paste your Google Business Profile Place ID here once it's set up (see Search Console / Google Maps "Share" link) — reviews will not display until this is filled in
 
-      var AVATAR_COLORS = ['#0E6B5C','#7c3aed','#059669','#dc2626','#d97706','#0891b2','#be185d'];
+      var AVATAR_COLORS = ['#0048A8','#7c3aed','#059669','#dc2626','#d97706','#0891b2','#be185d'];
       var GOOGLE_LOGO = '<svg width="20" height="20" viewBox="0 0 48 48" class="rv-glogo"><path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.1 33.8 29.6 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.5 20-21 0-1.3-.2-2.7-.5-4z"/><path fill="#EA4335" d="M6.3 14.7l7 5.1C15.2 16.1 19.3 13 24 13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3c-7.6 0-14.2 4.6-17.7 11.7z"/><path fill="#FBBC05" d="M24 45c5.5 0 10.4-1.9 14.2-5l-6.6-5.4C29.6 36.3 26.9 37 24 37c-5.5 0-10.2-3.3-11.8-8.1l-7 5.4C8 40.3 15.4 45 24 45z"/><path fill="#34A853" d="M44.5 20H24v8.5h11.8c-.9 2.6-2.7 4.8-5 6.1l6.6 5.4C41.3 36.5 45 30.7 45 24c0-1.3-.2-2.7-.5-4z"/></svg>';
 
       /* slider state */
