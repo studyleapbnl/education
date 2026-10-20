@@ -16,7 +16,7 @@ const DRIVE_FOLDER_NAME = "Study LEAP \u2013 Loan Documents";
 const NOTIFY_EMAIL      = "studyleapbnl@gmail.com";
 
 // ─── WHATSAPP CONFIG ──────────────────────────────────────────────────
-const WA_PHONE_ID = 'REPLACE_WITH_YOUR_META_PHONE_ID';   // ⚠️ get this from Meta Business Suite → WhatsApp → API Setup
+const WA_PHONE_ID = '1300838556451421';   // ⚠️ get this from Meta Business Suite → WhatsApp → API Setup
 const WA_TEMPLATE = 'studyleap_otp2';   // create this template name in your own WhatsApp Business account
 // ─────────────────────────────────────────────────────────────────────
 
@@ -119,8 +119,8 @@ function handleSendOTP(data) {
           language: { code: 'en' },
           components: [
             { type: 'body', parameters: [{ type: 'text', text: otp }] },
-            { type: 'button', sub_type: 'COPY_CODE', index: '0',
-              parameters: [{ type: 'coupon_code', coupon_code: otp }] }
+            { type: 'button', sub_type: 'url', index: '0',
+              parameters: [{ type: 'text', text: otp }] }
           ]
         }
       }),

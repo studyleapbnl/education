@@ -25,6 +25,14 @@ database_id = "3cb6c907-0c75-4b79-b792-af9095797775"
 [triggers]
 crons = ["*/30 * * * *"]
 
+# ── Plain-text variables (kept in sync with the Cloudflare dashboard) ─────────
+# Only variables stored as type "Variable" in the dashboard go here.
+# Everything stored as type "Secret" (WHATSAPP_PHONE_ID, WHATSAPP_TOKEN,
+# EMAILJS_*, INDEXNOW_KEY, CRM_SECRET, TURNSTILE_SECRET ...) stays in the
+# dashboard only and is NOT listed here - secrets survive every deploy.
+[vars]
+WHATSAPP_RECIPIENTS = "918837693510"
+
 # ── Secrets (add via Dashboard → education → Settings) ────
 #
 #  Variable (plain text) — these are EXAMPLE FORMATS ONLY, not real values.
