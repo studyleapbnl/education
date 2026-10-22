@@ -1,9 +1,48 @@
 User-agent: *
 Allow: /
-Disallow: /admin/
-Disallow: /private/
 Disallow: /?s=
-Disallow: /leads_v3.html
+Disallow: /upload-documents/
+
+# AI search / answer-engine crawlers: public pages may be read and cited.
+# (Each group repeats the private-path rule because a named group replaces the * group.)
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /upload-documents/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /upload-documents/
+
+User-agent: GPTBot
+Allow: /
+Disallow: /upload-documents/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /upload-documents/
+
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /upload-documents/
+
+User-agent: Claude-User
+Allow: /
+Disallow: /upload-documents/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /upload-documents/
+
+User-agent: Perplexity-User
+Allow: /
+Disallow: /upload-documents/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /upload-documents/
+
+User-agent: Applebot-Extended
+Allow: /
 Disallow: /upload-documents/
 
 # Allow SEO crawlers with a crawl delay

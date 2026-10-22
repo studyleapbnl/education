@@ -1,4 +1,24 @@
 /**
+ * v6.0 (2026-10-21) - security + reliability release
+ *   - NEW: server-side OTP for the document-upload page (POST /otp/send, POST /otp/verify).
+ *     The code is generated here with crypto.getRandomValues, stored only as a salted hash in
+ *     D1 (table otp_codes, created automatically), expires in 10 min, max 5 attempts, rate-limited
+ *     per IP and per phone. A successful verify returns a signed 60-minute token that Code.gs
+ *     (Apps Script) checks before accepting any upload. REQUIRES secret OTP_SECRET (same value
+ *     must be saved in Apps Script > Project Settings > Script Properties as UPLOAD_SECRET).
+ *   - Lead alerts now use the approved WhatsApp templates (studyleap_new_lead /
+ *     studyleap_lead_reminder) and fall back to plain text if a template send fails.
+ *   - Stricter phone validation (rejects 0000000000, 1234567890, 7-digit junk, bad Indian mobiles).
+ *   - Origin check no longer accepts look-alike Referer hosts (exact origin match).
+ *   - CRM secret comparison is constant-time and fails closed when CRM_SECRET is unset.
+ *   - Telegram messages are sent as plain text (Markdown parsing broke on _ and * in names).
+ *   - Duplicate lead (same phone within 10 min) is acknowledged but not re-notified;
+ *     auto-reply email is limited to 1 per address per 24 h; sub-1.5s form fills are dropped.
+ *   Optional variables: WHATSAPP_OTP_TEMPLATE (default studyleap_otp2), WHATSAPP_LEAD_TEMPLATE,
+ *     WHATSAPP_REMINDER_TEMPLATE, WHATSAPP_TEMPLATE_LANG (default en), WHATSAPP_TEMPLATES=off
+ *     (to force plain-text alerts).
+ */
+/**
  * Study LEAP Cloudflare Worker — v5.2
  * ─────────────────────────────────────────────────────────────────────────────
  * FIX v5.2 (2026-08-18) — WhatsApp/Telegram notifications not arriving:
@@ -84,6 +104,89 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
+// -- v6 helpers ---------------------------------------------------------------
+const _enc = new TextEncoder();
+const toHex = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+async function sha256Hex(str) { return toHex(await crypto.subtle.digest('SHA-256', _enc.encode(str))); }
+async function hmacHex(secret, msg) {
+  const key = await crypto.subtle.importKey('raw', _enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return toHex(await crypto.subtle.sign('HMAC', key, _enc.encode(msg)));
+}
+function safeEqual(a, b) {
+  a = String(a ?? ''); b = String(b ?? '');
+  let diff = a.length ^ b.length;
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return diff === 0;
+}
+// CRM endpoints: constant-time compare, fails closed if the secret is not configured.
+function authOk(request, env) {
+  if (!env.CRM_SECRET) return false;
+  return safeEqual(request.headers.get('X-CRM-Secret') || '', env.CRM_SECRET);
+}
+// Exact-origin check (the old Referer startsWith() also matched https://studyleap.in.evil.com).
+function requestOriginAllowed(request) {
+  const origin = request.headers.get('Origin') || '';
+  if (origin) return isAllowedOrigin(origin);
+  try { return isAllowedOrigin(new URL(request.headers.get('Referer') || '').origin); }
+  catch { return false; }
+}
+// Generic sliding-window limiter on its own table (does not share cleanup with the lead limiter).
+let _hitTableReady = false;
+async function hitLimit(db, key, max, windowMs) {
+  const now = Date.now();
+  try {
+    if (!_hitTableReady) {
+      await db.prepare('CREATE TABLE IF NOT EXISTS hit_limits (k TEXT PRIMARY KEY, hits TEXT NOT NULL, updatedAt INTEGER NOT NULL)').run();
+      _hitTableReady = true;
+    }
+    const row  = await db.prepare('SELECT hits FROM hit_limits WHERE k = ?').bind(key).first();
+    const hits = (row ? JSON.parse(row.hits || '[]') : []).filter(t => now - t < windowMs);
+    if (hits.length >= max) return true;
+    hits.push(now);
+    await db.prepare(`INSERT INTO hit_limits (k, hits, updatedAt) VALUES (?,?,?)
+      ON CONFLICT(k) DO UPDATE SET hits = excluded.hits, updatedAt = excluded.updatedAt`)
+      .bind(key, JSON.stringify(hits), now).run();
+    if (Math.random() < 0.05)
+      db.prepare('DELETE FROM hit_limits WHERE updatedAt < ?').bind(now - 2 * 24 * 3600 * 1000).run().catch(() => {});
+    return false;
+  } catch (err) {
+    console.error('hitLimit error:', err.message);
+    return false; // fail open
+  }
+}
+// Phone analysis: Indian mobiles must be 10 digits starting 6-9; other countries 7-15 digits.
+// Obvious fakes (all same digit, <=2 distinct digits, straight sequences) are rejected.
+function isJunkNumber(d) {
+  if (/^(\d)\1+$/.test(d)) return true;
+  if (new Set(d).size <= 2) return true;
+  const up = '01234567890123456789', down = '98765432109876543210';
+  return up.includes(d) || down.includes(d);
+}
+function analysePhone(raw) {
+  const s = String(raw || '').trim();
+  const d = s.replace(/\D/g, '');
+  const indian = (l) => ({ ok: /^[6-9]\d{9}$/.test(l) && !isJunkNumber(l), national: l, country: 'IN' });
+  if (s.startsWith('+')) {
+    if (d.startsWith('91')) return indian(d.slice(2));
+    return { ok: d.length >= 7 && d.length <= 15 && !isJunkNumber(d), national: d, country: 'INTL' };
+  }
+  if (d.length === 12 && d.startsWith('91')) return indian(d.slice(2));
+  if (d.length === 11 && d.startsWith('0'))  return indian(d.slice(1));
+  if (d.length === 10)                       return indian(d);
+  return { ok: false, national: d, country: '' };
+}
+const phoneKey = (raw) => String(raw || '').replace(/\D/g, '').slice(-10);
+// WhatsApp template parameters must be single-line, non-empty text.
+function waParam(v, max = 200) {
+  const t = String(v ?? '').replace(/[\r\n\t]+/g, ' ').replace(/ {4,}/g, '   ').trim().slice(0, max);
+  return t || '-';
+}
+// Telegram: strip WhatsApp-style *bold* / _italic_ markers and send as plain text.
+function toPlain(msg) {
+  return String(msg || '').replace(/\*([^*\n]+)\*/g, '$1').replace(/^_(.*)_$/gm, '$1');
+}
+
 // ── D1-backed Rate Limiter — per-IP sliding window (5 req / 10 min) ──────────
 async function isRateLimited(ip, db) {
   const WINDOW = 10 * 60 * 1000;
@@ -154,7 +257,7 @@ function validateLead(p) {
   if (!name || name.length < 2)        errors.push('Full name is required');
   if (name.length > 100)               errors.push('Full name too long');
   if (!phone)                          errors.push('Phone number is required');
-  if (!PHONE_RE.test(phone))           errors.push('Invalid phone number');
+  if (phone && (!PHONE_RE.test(phone) || !analysePhone(phone).ok)) errors.push('Invalid phone number');
   if (email && !EMAIL_RE.test(email))  errors.push('Invalid email format');
   for (const [k, v] of Object.entries(p)) {
     if (typeof v === 'string') {
@@ -195,52 +298,79 @@ function buildWhatsAppMessage(lead) {
 // or similar). The Code.gs OTP flow avoids this by using an approved
 // template — the same fix (a template) would make this immune to the
 // 24-hour window too, at the cost of needing Meta template approval.
-async function sendWhatsApp(env, message) {
+async function waPost(env, to, payload) {
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_ID}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${env.WHATSAPP_TOKEN}`,
+        },
+        body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to, ...payload }),
+        signal: AbortSignal.timeout(10000),
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (data.error) return { to, ok: false, error: `(#${data.error.code}) ${data.error.message}` };
+    if (!res.ok)    return { to, ok: false, error: `HTTP ${res.status}` };
+    return { to, ok: true, message_id: data.messages?.[0]?.id };
+  } catch (err) {
+    return { to, ok: false, error: err.message };
+  }
+}
+
+// Staff alerts: tries the approved TEMPLATE first (works outside the 24h window), then falls
+// back to free-form text (works only inside the 24h window). tpl = { name, params: [...] }.
+async function sendWhatsApp(env, message, tpl) {
   if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_ID)
     return { ok: false, error: 'WhatsApp env vars not set' };
 
-  // Use env var if set, otherwise fall back to hardcoded numbers
   const numbers = env.WHATSAPP_RECIPIENTS
     ? env.WHATSAPP_RECIPIENTS.split(',').map(n => n.trim()).filter(Boolean)
     : WA_FALLBACK_NUMBERS;
+  const lang = env.WHATSAPP_TEMPLATE_LANG || 'en';
 
   const results = await Promise.all(numbers.map(async (to) => {
-    try {
-      const res = await fetch(
-        `https://graph.facebook.com/v19.0/${env.WHATSAPP_PHONE_ID}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${env.WHATSAPP_TOKEN}`,
-          },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            recipient_type: 'individual',
-            to,
-            type: 'text',
-            text: { preview_url: false, body: message },
-          }),
-        }
-      );
-      const data = await res.json();
-      if (data.error) return { to, ok: false, error: `(#${data.error.code}) ${data.error.message}` };
-      return { to, ok: true, message_id: data.messages?.[0]?.id };
-    } catch (err) {
-      return { to, ok: false, error: err.message };
+    if (tpl && env.WHATSAPP_TEMPLATES !== 'off') {
+      const t = await waPost(env, to, {
+        type: 'template',
+        template: {
+          name: tpl.name,
+          language: { code: lang },
+          components: [{ type: 'body', parameters: tpl.params.map(p => ({ type: 'text', text: waParam(p) })) }],
+        },
+      });
+      if (t.ok) return { ...t, via: 'template' };
+      console.warn(`WhatsApp template ${tpl.name} failed for ${to}: ${t.error} - falling back to text`);
     }
+    const r = await waPost(env, to, { type: 'text', text: { preview_url: false, body: message } });
+    return r.ok ? { ...r, via: 'text' } : r;
   }));
 
   const failed = results.filter(r => !r.ok);
-  if (failed.length) {
-    // Log every failure, even partial ones (e.g. 1 of 2 numbers rejected) —
-    // previously these were silently dropped once at least one number succeeded.
+  if (failed.length)
     console.error('WhatsApp send failures:', failed.map(r => `${r.to}: ${r.error}`).join(' | '));
-  }
   if (failed.length === numbers.length)
     return { ok: false, error: failed.map(r => `${r.to}: ${r.error}`).join(' | ') };
-
   return { ok: true, results };
+}
+
+// OTP: approved AUTHENTICATION template (body = code, copy-code button = code).
+async function sendWhatsAppOtp(env, phone10, code) {
+  if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_ID) return { ok: false, error: 'WhatsApp env vars not set' };
+  return waPost(env, '91' + phone10, {
+    type: 'template',
+    template: {
+      name: env.WHATSAPP_OTP_TEMPLATE || 'studyleap_otp2',
+      language: { code: env.WHATSAPP_OTP_LANG || 'en' },
+      components: [
+        { type: 'body',   parameters: [{ type: 'text', text: code }] },
+        { type: 'button', sub_type: 'url', index: '0', parameters: [{ type: 'text', text: code }] },
+      ],
+    },
+  });
 }
 
 // ── Telegram ───────────────────────────────────────────────────────────────
@@ -255,8 +385,7 @@ async function sendTelegram(env, message) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chat_id:    env.TELEGRAM_CHAT_ID,
-          text:       message,
-          parse_mode: 'Markdown',
+          text:       toPlain(message),
         }),
       }
     );
@@ -283,10 +412,16 @@ export default {
 
     // POST / — form submission (check CORS origin first)
     if (method === 'POST' && url.pathname === '/') {
-      const referer = request.headers.get('Referer') || '';
-      const ok = isAllowedOrigin(origin) || ALLOWED_ORIGINS.some(o => referer.startsWith(o));
-      if (!ok) return json({ ok: false, error: 'Forbidden' }, 403, origin);
+      if (!requestOriginAllowed(request)) return json({ ok: false, error: 'Forbidden' }, 403, origin);
       return handleFormSubmit(request, env, origin);
+    }
+
+    // POST /otp/send, /otp/verify - server-side OTP for the document-upload page
+    if (method === 'POST' && (url.pathname === '/otp/send' || url.pathname === '/otp/verify')) {
+      if (!requestOriginAllowed(request)) return json({ ok: false, error: 'Forbidden' }, 403, origin);
+      return url.pathname === '/otp/send'
+        ? handleOtpSend(request, env, origin)
+        : handleOtpVerify(request, env, origin);
     }
 
     if (method === 'POST'   && url.pathname === '/indexnow')       return handleIndexNow(request, env, origin);
@@ -408,7 +543,10 @@ async function handleFollowUpReminders(env) {
       `👉 Please contact them immediately!`,
     ].filter(Boolean).join('\n');
 
-    const waResult = await sendWhatsApp(env, waMsg);
+    const waResult = await sendWhatsApp(env, waMsg, {
+      name: env.WHATSAPP_REMINDER_TEMPLATE || 'studyleap_lead_reminder',
+      params: [waitStr, lead.name, lead.phone, lead.city, lead.loanType || 'Not specified', lead.id],
+    });
     if (!waResult.ok) {
       console.error(`[Cron] WhatsApp failed for ${lead.id}:`, waResult.error);
       continue;
@@ -467,6 +605,11 @@ async function handleFormSubmit(request, env, origin) {
   if (honeypot && honeypot.trim().length > 0)
     return json({ ok: true, id: uid(), errors: [] }, 200, origin);
 
+  // 1b. Bot speed check: a form submitted within 1.5 s of the page loading was not filled by a person.
+  //     (Only applied when the page sends formOpenedAt; older cached pages are unaffected.)
+  if (Number(body.formOpenedAt) > 0 && Date.now() - Number(body.formOpenedAt) < 1500)
+    return json({ ok: true, id: uid(), errors: [] }, 200, origin);
+
   // ── 2. Turnstile ──────────────────────────────────────────────────────────
   // Forms that show the Turnstile box always send a token, and it is verified.
   // Inner-page forms have no box yet, so a missing token is accepted unless the
@@ -485,6 +628,15 @@ async function handleFormSubmit(request, env, origin) {
     return json({ ok: false, errors: validationErrors }, 400, origin);
 
   // ── 4. Build lead ─────────────────────────────────────────────────────────
+  // Duplicate guard: same phone within 10 minutes -> acknowledge, do not re-notify.
+  try {
+    const recent = await env.DB.prepare('SELECT phone FROM leads WHERE createdAt >= ?')
+      .bind(new Date(Date.now() - 10 * 60 * 1000).toISOString()).all();
+    const me = phoneKey(emailParams['Phone']);
+    if ((recent.results || []).some(r => phoneKey(r.phone) === me))
+      return json({ ok: true, id: uid(), duplicate: true, errors: [] }, 200, origin);
+  } catch (err) { console.warn('Duplicate check skipped:', err.message); }
+
   const lead = {
     id:          uid(),
     name:        emailParams['Full Name'].trim().slice(0, 100),
@@ -538,7 +690,11 @@ async function handleFormSubmit(request, env, origin) {
   const tgMessage = telegramMessage || waMessage;
 
   const [waResult, tgResult] = await Promise.all([
-    sendWhatsApp(env, waMessage),
+    sendWhatsApp(env, waMessage, {
+      name: env.WHATSAPP_LEAD_TEMPLATE || 'studyleap_new_lead',
+      params: [lead.name, lead.phone, lead.city, lead.loanType, lead.loanAmount, lead.course,
+               lead.destination, lead.message, lead.source, lead.id],
+    }),
     sendTelegram(env, tgMessage),
   ]);
 
@@ -593,7 +749,8 @@ async function handleFormSubmit(request, env, origin) {
     env.EMAILJS_PUBLIC_KEY &&
     studentEmail &&
     studentEmail !== 'Not provided' &&
-    EMAIL_RE.test(studentEmail)
+    EMAIL_RE.test(studentEmail) &&
+    !(await hitLimit(env.DB, 'ar:' + await sha256Hex(studentEmail.toLowerCase()), 1, 24 * 3600 * 1000))
   ) {
     try {
       const arRes = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
@@ -626,7 +783,7 @@ async function handleFormSubmit(request, env, origin) {
 
 // ── IndexNow ping ─────────────────────────────────────────────────────────
 async function handleIndexNow(request, env, origin) {
-  if (request.headers.get('X-CRM-Secret') !== env.CRM_SECRET)
+  if (!authOk(request, env))
     return json({ ok: false, error: 'Unauthorized' }, 401, origin);
 
   if (!env.INDEXNOW_KEY)
@@ -670,7 +827,7 @@ async function handleIndexNow(request, env, origin) {
 
 // ── Get leads ──────────────────────────────────────────────────────────────
 async function handleGetLeads(request, env, origin) {
-  if (request.headers.get('X-CRM-Secret') !== env.CRM_SECRET)
+  if (!authOk(request, env))
     return json({ ok: false, error: 'Unauthorized' }, 401, origin);
   try {
     const result = await env.DB.prepare(
@@ -688,7 +845,7 @@ async function handleGetLeads(request, env, origin) {
 
 // ── Update lead ────────────────────────────────────────────────────────────
 async function handleUpdateLead(request, env, id, origin) {
-  if (request.headers.get('X-CRM-Secret') !== env.CRM_SECRET)
+  if (!authOk(request, env))
     return json({ ok: false, error: 'Unauthorized' }, 401, origin);
   let body;
   try { body = await request.json(); }
@@ -717,7 +874,7 @@ async function handleUpdateLead(request, env, id, origin) {
 
 // ── Delete lead ────────────────────────────────────────────────────────────
 async function handleDeleteLead(request, env, id, origin) {
-  if (request.headers.get('X-CRM-Secret') !== env.CRM_SECRET)
+  if (!authOk(request, env))
     return json({ ok: false, error: 'Unauthorized' }, 401, origin);
   try {
     await env.DB.prepare('DELETE FROM leads WHERE id = ?').bind(id).run();
@@ -725,4 +882,108 @@ async function handleDeleteLead(request, env, id, origin) {
   } catch (err) {
     return json({ ok: false, error: err.message }, 500, origin);
   }
+}
+
+
+// -- Server-side OTP (document-upload page) -----------------------------------
+let _otpTableReady = false;
+async function ensureOtpTable(db) {
+  if (_otpTableReady) return;
+  await db.prepare(`CREATE TABLE IF NOT EXISTS otp_codes (
+    phone TEXT PRIMARY KEY, code_hash TEXT NOT NULL, expires_at INTEGER NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0, sent_at INTEGER NOT NULL,
+    send_count INTEGER NOT NULL DEFAULT 1, window_start INTEGER NOT NULL)`).run();
+  _otpTableReady = true;
+}
+
+async function handleOtpSend(request, env, origin) {
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  if (!env.OTP_SECRET) {
+    console.error('[OTP] OTP_SECRET is not set - OTP disabled');
+    return json({ ok: false, error: 'OTP service not configured' }, 503, origin);
+  }
+  if (await hitLimit(env.DB, 'otp-ip:' + ip, 10, 15 * 60 * 1000))
+    return json({ ok: false, error: 'Too many requests. Please try again later.' }, 429, origin);
+
+  let body;
+  try { body = await request.json(); }
+  catch { return json({ ok: false, error: 'Invalid JSON' }, 400, origin); }
+
+  const phone = String(body.phone || '').replace(/\D/g, '');
+  if (!/^[6-9]\d{9}$/.test(phone) || isJunkNumber(phone))
+    return json({ ok: false, error: 'Enter a valid 10-digit mobile number' }, 400, origin);
+
+  await ensureOtpTable(env.DB);
+  const now = Date.now();
+  const row = await env.DB.prepare('SELECT * FROM otp_codes WHERE phone = ?').bind(phone).first();
+  let sendCount = 1, windowStart = now;
+  if (row) {
+    const since = now - row.sent_at;
+    if (since < 30000)
+      return json({ ok: false, error: 'Please wait before requesting another OTP.', retryAfter: Math.ceil((30000 - since) / 1000) }, 429, origin);
+    if (now - row.window_start < 15 * 60 * 1000) {
+      if (row.send_count >= 3)
+        return json({ ok: false, error: 'Too many OTP requests for this number. Try again in 15 minutes.' }, 429, origin);
+      sendCount = row.send_count + 1;
+      windowStart = row.window_start;
+    }
+  }
+
+  const code = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
+  const hash = await sha256Hex(`${env.OTP_SECRET}:${phone}:${code}`);
+  await env.DB.prepare(`INSERT INTO otp_codes (phone, code_hash, expires_at, attempts, sent_at, send_count, window_start)
+    VALUES (?,?,?,0,?,?,?)
+    ON CONFLICT(phone) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at,
+      attempts = 0, sent_at = excluded.sent_at, send_count = excluded.send_count, window_start = excluded.window_start`)
+    .bind(phone, hash, now + 10 * 60 * 1000, now, sendCount, windowStart).run();
+
+  const sent = await sendWhatsAppOtp(env, phone, code);
+  if (!sent.ok) {
+    console.error(`[OTP] WhatsApp send failed for ******${phone.slice(-4)}: ${sent.error}`);
+    return json({ ok: false, error: 'Could not send OTP. Please try again.' }, 502, origin);
+  }
+  return json({ ok: true, expiresIn: 600, resendIn: 30 }, 200, origin);
+}
+
+async function handleOtpVerify(request, env, origin) {
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  if (!env.OTP_SECRET) return json({ ok: false, error: 'OTP service not configured' }, 503, origin);
+  if (await hitLimit(env.DB, 'otp-v-ip:' + ip, 30, 15 * 60 * 1000))
+    return json({ ok: false, error: 'Too many requests. Please try again later.' }, 429, origin);
+
+  let body;
+  try { body = await request.json(); }
+  catch { return json({ ok: false, error: 'Invalid JSON' }, 400, origin); }
+
+  const phone = String(body.phone || '').replace(/\D/g, '');
+  const code  = String(body.code  || '').trim();
+  if (!/^[6-9]\d{9}$/.test(phone) || !/^\d{6}$/.test(code))
+    return json({ ok: false, error: 'Enter the 6-digit OTP' }, 400, origin);
+
+  await ensureOtpTable(env.DB);
+  const row = await env.DB.prepare('SELECT * FROM otp_codes WHERE phone = ?').bind(phone).first();
+  if (!row) return json({ ok: false, error: 'No active OTP. Please request a new one.' }, 400, origin);
+
+  const now = Date.now();
+  if (now > row.expires_at) {
+    await env.DB.prepare('DELETE FROM otp_codes WHERE phone = ?').bind(phone).run();
+    return json({ ok: false, error: 'OTP expired. Please request a new one.' }, 400, origin);
+  }
+  if (row.attempts >= 5) {
+    await env.DB.prepare('DELETE FROM otp_codes WHERE phone = ?').bind(phone).run();
+    return json({ ok: false, error: 'Too many wrong attempts. Please request a new OTP.' }, 429, origin);
+  }
+
+  const hash = await sha256Hex(`${env.OTP_SECRET}:${phone}:${code}`);
+  if (!safeEqual(hash, row.code_hash)) {
+    const attempts = row.attempts + 1;
+    if (attempts >= 5) await env.DB.prepare('DELETE FROM otp_codes WHERE phone = ?').bind(phone).run();
+    else await env.DB.prepare('UPDATE otp_codes SET attempts = ? WHERE phone = ?').bind(attempts, phone).run();
+    return json({ ok: false, error: 'Incorrect OTP', attemptsLeft: Math.max(0, 5 - attempts) }, 400, origin);
+  }
+
+  await env.DB.prepare('DELETE FROM otp_codes WHERE phone = ?').bind(phone).run();
+  const exp   = now + 60 * 60 * 1000;                       // token valid for 60 minutes
+  const sig   = await hmacHex(env.OTP_SECRET, `${phone}.${exp}`);
+  return json({ ok: true, token: `${phone}.${exp}.${sig}`, expiresAt: exp }, 200, origin);
 }

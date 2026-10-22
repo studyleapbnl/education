@@ -183,8 +183,8 @@ async function submitToWorker(emailParams, telegramMessage, turnstileToken = '')
     res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emailParams, telegramMessage, honeypot: hpVal, turnstileToken }),
-      signal: AbortSignal.timeout(10000)   // 10-second timeout
+      body: JSON.stringify({ emailParams, telegramMessage, honeypot: hpVal, turnstileToken, formOpenedAt: Math.round(performance.timeOrigin) }),
+      signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(10000) : undefined   // 10-second timeout
     });
   } catch (networkErr) {
     // Network error (DNS failure, no internet, CORS, timeout)
@@ -331,7 +331,7 @@ function calcEMI() {
   document.getElementById('emiResult').textContent     = '₹' + Math.round(emi).toLocaleString('en-IN');
   document.getElementById('principalDisp').textContent = '₹' + P0.toLocaleString('en-IN');
   document.getElementById('interestDisp').textContent  = '₹' + Math.round(totalInterest).toLocaleString('en-IN');
-  document.getElementById('totalDisp').textContent     = '₹' + Math.round(totalPayable + morInterest).toLocaleString('en-IN');
+  document.getElementById('totalDisp').textContent     = '₹' + Math.round(totalPayable).toLocaleString('en-IN');
   document.getElementById('repayStart').textContent    = mor === 0 ? 'Immediately' : 'After ' + mor + (mor === 1 ? ' Year' : ' Years');
 }
 calcEMI();

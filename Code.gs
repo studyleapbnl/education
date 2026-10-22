@@ -1,174 +1,158 @@
-// ═══════════════════════════════════════════════════════════════════════
-//  Study LEAP – Google Apps Script  (Code.gs)
-//  VERSION 3 – Image compression + robust single-POST upload
-// ═══════════════════════════════════════════════════════════════════════
+// ======================================================================
+//  Study LEAP - Google Apps Script  (Code.gs)
+//  VERSION 4 - token-protected uploads, validated files, no public OTP
+// ======================================================================
 //
-//  ★ AFTER PASTING THIS CODE:
-//  1. Project Settings (⚙️) → Script Properties → WA_TOKEN = <permanent token>
-//  2. Deploy → NEW Deployment (not edit existing) → Web App
-//     Execute as: Me | Access: Anyone → copy new URL to index.html
-//  3. Run testOTP()    to confirm WhatsApp works
-//  4. Run testUpload() to confirm Drive works
+//  SECURITY MODEL (v4)
+//  - The OTP is now generated, sent and verified by the Cloudflare Worker
+//    (POST /otp/send and /otp/verify). This script NEVER sends OTPs.
+//  - A successful OTP check gives the browser a signed token
+//    (phone.expiry.signature). Every upload and summary request must carry
+//    a valid, unexpired token; the phone number comes from the token, not
+//    from the browser.
+//  - Files are checked server-side: allowed document types only, PDF/JPG/
+//    PNG/WebP only (verified by file signature), max 10 MB each.
 //
-// ═══════════════════════════════════════════════════════════════════════
+//  SETUP
+//  1. Project Settings (gear) > Script Properties > add
+//         UPLOAD_SECRET = <same value as the Worker secret OTP_SECRET>
+//     (use a long random string, at least 32 characters)
+//  2. Deploy > Manage deployments > Edit (pencil) > Version: New version >
+//     Deploy   (keeps the same /exec URL)
+//  3. Run testToken(), then testUpload() once to authorise Drive/Gmail.
+//
+// ======================================================================
 
 const DRIVE_FOLDER_NAME = "Study LEAP \u2013 Loan Documents";
 const NOTIFY_EMAIL      = "studyleapbnl@gmail.com";
 
-// ─── WHATSAPP CONFIG ──────────────────────────────────────────────────
-const WA_PHONE_ID = '1300838556451421';   // ⚠️ get this from Meta Business Suite → WhatsApp → API Setup
-const WA_TEMPLATE = 'studyleap_otp2';   // create this template name in your own WhatsApp Business account
-// ─────────────────────────────────────────────────────────────────────
+const ALLOWED_DOC_KEYS = ['aadhaar', 'pan', 'tenth', 'twelfth', 'grad', 'admit', 'income', 'bank', 'photo', 'passport', 'gre', 'other'];
+const ALLOWED_MIME     = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+const MAX_FILE_BYTES         = 10 * 1024 * 1024;  // 10 MB per file
+const MAX_UPLOADS_PER_HOUR   = 40;                // per verified phone number
+const MAX_SUMMARIES_PER_HOUR = 3;                 // per verified phone number
 
-// ─── doGet — OTP requests from browser ───────────────────────────────
+// --- doGet: status only (no actions are exposed) -----------------------
 function doGet(e) {
-  try {
-    const p = e.parameter || {};
-    Logger.log('doGet action: ' + p.action);
-
-    if (p.action === 'sendOTP') {
-      return jsonOut(handleSendOTP({ phone: p.phone, otp: p.otp }));
-    }
-
-    if (p.action === 'sendSummary') {
-      return jsonOut(handleSendSummary({
-        studentInfo: {
-          name: p.studentName, phone: p.studentPhone,
-          email: p.studentEmail, course: p.studentCourse,
-          college: p.studentCollege, amount: p.loanAmount
-        },
-        docsUploaded: (p.docsUploaded || '').split(',')
-      }));
-    }
-
-    return jsonOut({ status: 'Study LEAP API v3 running' });
-
-  } catch(err) {
-    Logger.log('doGet ERROR: ' + err.message);
-    return jsonOut({ ok: false, error: err.message });
-  }
+  return jsonOut({ status: 'Study LEAP API v4 running' });
 }
 
-// ─── doPost — file uploads from browser ──────────────────────────────
+// --- doPost: uploads + summary (token required) ------------------------
 function doPost(e) {
   try {
-    const ct = (e.postData && e.postData.type) || '';
-    Logger.log('doPost content-type: ' + ct);
-
     let data;
-
-    // Form POST from browser: e.parameter.data contains JSON string
-    if (e.parameter && e.parameter.data) {
-      data = JSON.parse(e.parameter.data);
-
-    // Raw JSON body (application/json or text/plain)
-    } else if (e.postData && e.postData.contents) {
-      data = JSON.parse(e.postData.contents);
-
-    } else {
-      data = e.parameter || {};
-    }
-
-    Logger.log('doPost action: ' + data.action);
+    if (e.parameter && e.parameter.data)        data = JSON.parse(e.parameter.data);   // form POST from browser
+    else if (e.postData && e.postData.contents) data = JSON.parse(e.postData.contents);
+    else                                        data = e.parameter || {};
 
     let result;
     if      (data.action === 'uploadFile')  result = handleUploadFile(data);
-    else if (data.action === 'sendOTP')     result = handleSendOTP(data);
     else if (data.action === 'sendSummary') result = handleSendSummary(data);
-    else throw new Error('Unknown action: ' + data.action);
-
+    else throw new Error('Unknown action');
     return jsonOut(result);
-
-  } catch(err) {
+  } catch (err) {
     Logger.log('doPost ERROR: ' + err.message);
     return jsonOut({ ok: false, error: err.message });
   }
 }
 
-// ─── SEND OTP ─────────────────────────────────────────────────────────
-function handleSendOTP(data) {
-  const phone = String(data.phone || '').trim();
-  const otp   = String(data.otp   || '').trim();
-  if (phone.length < 10) throw new Error('Invalid phone: ' + phone);
-  if (otp.length   <  4) throw new Error('Invalid OTP: '   + otp);
-
-  Logger.log('Sending OTP ' + otp + ' to ' + phone);
-
-  // Backup email
-  try {
-    GmailApp.sendEmail(NOTIFY_EMAIL, 'Study LEAP OTP for ' + phone,
-      'OTP: ' + otp + '\nPhone: +91 ' + phone +
-      '\nTime: ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }));
-  } catch(e) { Logger.log('Backup email failed: ' + e.message); }
-
-  // WhatsApp
-  const waToken = PropertiesService.getScriptProperties().getProperty('WA_TOKEN');
-  if (!waToken) return { sent: true, channel: 'email-only', reason: 'WA_TOKEN not set' };
-
-  const res = UrlFetchApp.fetch(
-    'https://graph.facebook.com/v19.0/' + WA_PHONE_ID + '/messages',
-    {
-      method: 'post',
-      headers: { Authorization: 'Bearer ' + waToken, 'Content-Type': 'application/json' },
-      payload: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: '91' + phone,
-        type: 'template',
-        template: {
-          name: WA_TEMPLATE,
-          language: { code: 'en' },
-          components: [
-            { type: 'body', parameters: [{ type: 'text', text: otp }] },
-            { type: 'button', sub_type: 'url', index: '0',
-              parameters: [{ type: 'text', text: otp }] }
-          ]
-        }
-      }),
-      muteHttpExceptions: true
-    }
-  );
-
-  const body = JSON.parse(res.getContentText());
-  Logger.log('WA response: ' + JSON.stringify(body));
-
-  if (body.messages && body.messages[0] && body.messages[0].id) {
-    Logger.log('\u2705 WA OTP sent, ID: ' + body.messages[0].id);
-    return { sent: true, channel: 'whatsapp', msgId: body.messages[0].id };
-  }
-
-  const code = (body.error && body.error.code) || 'unknown';
-  const msg  = (body.error && body.error.message) || JSON.stringify(body);
-  Logger.log('WA FAILED — code ' + code + ': ' + msg);
-  if (code === 190)   Logger.log('ACTION: Regenerate WA_TOKEN in Meta console.');
-  if (code === 131030) Logger.log('ACTION: Add +91' + phone + ' as test recipient in Meta.');
-  return { sent: true, channel: 'email-fallback', waError: { code, msg } };
+// --- TOKEN + VALIDATION HELPERS ---------------------------------------
+function getSecret_() {
+  const s = PropertiesService.getScriptProperties().getProperty('UPLOAD_SECRET');
+  if (!s || s.length < 16) throw new Error('Upload service not configured');
+  return s;
+}
+function hmacHex_(secret, msg) {
+  const sig = Utilities.computeHmacSha256Signature(msg, secret);
+  return sig.map(function (b) { return ('0' + ((b + 256) % 256).toString(16)).slice(-2); }).join('');
+}
+function safeEq_(a, b) {
+  if (a.length !== b.length) return false;
+  var d = 0;
+  for (var i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+// Returns the verified 10-digit phone number or throws.
+function verifyToken_(token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 3) throw new Error('Mobile number not verified');
+  const phone = parts[0], exp = Number(parts[1]);
+  if (!/^[6-9]\d{9}$/.test(phone) || !exp) throw new Error('Mobile number not verified');
+  if (Date.now() > exp) throw new Error('Verification expired. Please verify your mobile number again.');
+  if (!safeEq_(hmacHex_(getSecret_(), phone + '.' + parts[1]), parts[2])) throw new Error('Mobile number not verified');
+  return phone;
+}
+function bump_(key, max, ttlSec) {
+  const cache = CacheService.getScriptCache();
+  const n = Number(cache.get(key) || 0) + 1;
+  if (n > max) throw new Error('Too many requests. Please try again later.');
+  cache.put(key, String(n), ttlSec);
+}
+function sniffMime_(bytes) {
+  function b(i) { return bytes[i] === undefined ? -1 : (bytes[i] + 256) % 256; }
+  if (b(0) === 0x25 && b(1) === 0x50 && b(2) === 0x44 && b(3) === 0x46) return 'application/pdf';
+  if (b(0) === 0xFF && b(1) === 0xD8 && b(2) === 0xFF) return 'image/jpeg';
+  if (b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4E && b(3) === 0x47) return 'image/png';
+  if (b(0) === 0x52 && b(1) === 0x49 && b(2) === 0x46 && b(3) === 0x46 &&
+      b(8) === 0x57 && b(9) === 0x45 && b(10) === 0x42 && b(11) === 0x50) return 'image/webp';
+  return '';
+}
+function clean_(v, max) {
+  return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+function esc_(v) {
+  return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function cleanName_(name, ext) {
+  var base = String(name || 'document').split(/[\\\/]/).pop().replace(/\.[^.]*$/, '')
+    .replace(/[^A-Za-z0-9._ -]/g, '_').slice(0, 60) || 'document';
+  return base + '.' + ext;
+}
+function sanitizeInfo_(si, phone) {
+  si = si || {};
+  const email = clean_(si.email, 120);
+  return {
+    name: clean_(si.name, 80) || 'Unknown',
+    phone: phone,                                           // from the verified token, never from the browser
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : '',
+    course: clean_(si.course, 120), college: clean_(si.college, 120), amount: clean_(si.amount, 40),
+    courseStartDate: clean_(si.courseStartDate, 30), bank: clean_(si.bank, 60),
+    coName: clean_(si.coName, 80), coRelation: clean_(si.coRelation, 40),
+    coOccupation: clean_(si.coOccupation, 60), coIncome: clean_(si.coIncome, 40)
+  };
 }
 
-// ─── UPLOAD FILE TO GOOGLE DRIVE ──────────────────────────────────────
+// --- UPLOAD FILE ------------------------------------------------------
 function handleUploadFile(data) {
-  if (!data.data)        throw new Error('No file data in request');
-  if (!data.studentInfo) throw new Error('No studentInfo in request');
+  const phone = verifyToken_(data.token);
+  if (!data.data || typeof data.data !== 'string') throw new Error('No file data in request');
+  if (ALLOWED_DOC_KEYS.indexOf(data.docKey) < 0)   throw new Error('Unknown document type');
+  if (data.data.length > Math.ceil(MAX_FILE_BYTES * 4 / 3) + 16) throw new Error('File too large (max 10 MB)');
+  bump_('up:' + phone, MAX_UPLOADS_PER_HOUR, 3600);
 
-  const si = data.studentInfo;
-  Logger.log('handleUploadFile: ' + data.docKey + ' | ' + data.fileName +
-             ' | ' + data.mimeType + ' | student: ' + si.name);
+  const bytes = Utilities.base64Decode(data.data);
+  if (bytes.length > MAX_FILE_BYTES) throw new Error('File too large (max 10 MB)');
+  const real = sniffMime_(bytes);
+  if (!real || !ALLOWED_MIME[real]) throw new Error('Only PDF, JPG, PNG or WebP files are accepted');
 
+  const si     = sanitizeInfo_(data.studentInfo, phone);
   const folder = getOrCreateFolder(si);
-  const bytes  = Utilities.base64Decode(data.data);
-  const blob   = Utilities.newBlob(bytes, data.mimeType, data.docKey + '_' + data.fileName);
-  const file   = folder.createFile(blob);
-
-  Logger.log('\u2705 File saved: ' + file.getName() + ' (' + file.getId() + ')');
-  Logger.log('Drive folder: ' + folder.getUrl());
-
-  return { ok: true, fileId: file.getId(), url: file.getUrl(), folder: folder.getUrl() };
+  const name   = data.docKey + '_' + cleanName_(data.fileName, ALLOWED_MIME[real]);
+  const file   = folder.createFile(Utilities.newBlob(bytes, real, name));
+  Logger.log('File saved: ' + file.getName() + ' (' + data.docKey + ') for ***' + phone.slice(-4));
+  return { ok: true, name: name };
 }
 
-// ─── SEND SUMMARY EMAIL ───────────────────────────────────────────────
+// --- SEND SUMMARY EMAIL -----------------------------------------------
 function handleSendSummary(data) {
-  const si   = data.studentInfo;
-  const docs = Array.isArray(data.docsUploaded)
-    ? data.docsUploaded.join(', ') : String(data.docsUploaded || '');
+  const phone = verifyToken_(data.token);              // must have passed WhatsApp OTP
+  bump_('sum:' + phone, MAX_SUMMARIES_PER_HOUR, 3600);
+  const si   = sanitizeInfo_(data.studentInfo, phone);
+  const uploaded = (Array.isArray(data.docsUploaded) ? data.docsUploaded : [])
+    .filter(function (k) { return ALLOWED_DOC_KEYS.indexOf(k) >= 0; });
+  data = { docsUploaded: uploaded };
+  const docs = uploaded.join(', ');
 
   const rootFolder = getOrCreateRootFolder();
   const folderUrl  = rootFolder.getUrl();
@@ -202,7 +186,8 @@ function handleSendSummary(data) {
       const docLabels = {
         aadhaar: 'Aadhaar Card', pan: 'PAN Card',
         tenth:   '10th Marksheet', twelfth: '12th Marksheet',
-        admit:   'Admission Letter', income: 'Income Proof'
+        admit:   'Admission Letter', income: 'Income Proof', grad: 'Graduation Marksheet', bank: 'Bank Statement',
+        photo: 'Passport-size Photo', passport: 'Passport', gre: 'GRE / IELTS Score', other: 'Other Document'
       };
       const docList = (Array.isArray(data.docsUploaded) ? data.docsUploaded : [])
         .map(k => '<li style="margin:4px 0;">✅ ' + (docLabels[k] || k) + '</li>')
@@ -233,7 +218,7 @@ function handleSendSummary(data) {
         'padding:10px 24px;margin-bottom:20px;">' +
         '<span style="color:#16a34a;font-weight:700;font-size:15px;">✅ Documents Successfully Received</span>' +
         '</div>' +
-        '<h2 style="margin:0 0 8px;color:#1e293b;font-size:22px;">Hi ' + (si.name || 'Applicant') + '!</h2>' +
+        '<h2 style="margin:0 0 8px;color:#1e293b;font-size:22px;">Hi ' + esc_(si.name || 'Applicant') + '!</h2>' +
         '<p style="margin:0;color:#64748b;font-size:15px;line-height:1.6;">' +
         'We have received your loan application documents. Our team will review them and get back to you within <strong>24–48 hours</strong>.' +
         '</p>' +
@@ -253,13 +238,13 @@ function handleSendSummary(data) {
         '<h3 style="margin:0 0 14px;color:#1e293b;font-size:16px;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">Application Summary</h3>' +
         '<table width="100%" cellpadding="0" cellspacing="0">' +
         '<tr><td style="padding:6px 0;color:#64748b;font-size:14px;width:45%;">Course</td>' +
-        '<td style="padding:6px 0;color:#1e293b;font-size:14px;font-weight:600;">' + (si.course || '—') + '</td></tr>' +
+        '<td style="padding:6px 0;color:#1e293b;font-size:14px;font-weight:600;">' + esc_(si.course || '—') + '</td></tr>' +
         '<tr><td style="padding:6px 0;color:#64748b;font-size:14px;">College / Country</td>' +
-        '<td style="padding:6px 0;color:#1e293b;font-size:14px;font-weight:600;">' + (si.college || '—') + '</td></tr>' +
+        '<td style="padding:6px 0;color:#1e293b;font-size:14px;font-weight:600;">' + esc_(si.college || '—') + '</td></tr>' +
         '<tr><td style="padding:6px 0;color:#64748b;font-size:14px;">Loan Amount</td>' +
-        '<td style="padding:6px 0;color:#1e293b;font-size:14px;font-weight:600;">' + (si.amount || '—') + '</td></tr>' +
+        '<td style="padding:6px 0;color:#1e293b;font-size:14px;font-weight:600;">' + esc_(si.amount || '—') + '</td></tr>' +
         '<tr><td style="padding:6px 0;color:#64748b;font-size:14px;">Phone</td>' +
-        '<td style="padding:6px 0;color:#1e293b;font-size:14px;font-weight:600;">+91 ' + (si.phone || '—') + '</td></tr>' +
+        '<td style="padding:6px 0;color:#1e293b;font-size:14px;font-weight:600;">+91 ' + esc_(si.phone || '—') + '</td></tr>' +
         '</table>' +
         '</td></tr>' +
 
@@ -325,37 +310,33 @@ function handleSendSummary(data) {
   return { ok: true, notified: true };
 }
 
-// ─── TEST FUNCTIONS ───────────────────────────────────────────────────
-
-// Run to confirm WhatsApp OTP delivery
-function testOTP() {
-  const result = handleSendOTP({ phone: '9811419926', otp: '123456' });
-  Logger.log('testOTP result: ' + JSON.stringify(result));
-  if (result.channel === 'whatsapp') Logger.log('\u2705 SUCCESS');
-  else Logger.log('\u26a0\uFE0F  Check WA error above');
+// --- TEST FUNCTIONS ---------------------------------------------------
+// Builds a valid token locally so you can test without WhatsApp.
+function makeTestToken_(phone) {
+  const exp = String(Date.now() + 10 * 60 * 1000);
+  return phone + '.' + exp + '.' + hmacHex_(getSecret_(), phone + '.' + exp);
 }
 
-// Run to confirm Drive upload is working
+// Run first: confirms UPLOAD_SECRET is set and token checking works.
+function testToken() {
+  const tok = makeTestToken_('9811234567');
+  Logger.log('verify good token  -> ' + verifyToken_(tok));
+  try { verifyToken_(tok.slice(0, -2) + 'zz'); Logger.log('FAILED: tampered token accepted'); }
+  catch (e) { Logger.log('tampered token rejected OK: ' + e.message); }
+  Logger.log('testToken OK');
+}
+
+// Run second: uploads a tiny PDF into Drive (also authorises Drive + Gmail access).
 function testUpload() {
-  Logger.log('=== testUpload ===');
-  const testData = {
-    docKey:  'test',
-    fileName: 'test_file.txt',
-    mimeType: 'text/plain',
-    // "Hello Study LEAP Test" in base64
-    data:    'SGVsbG8gU3R1ZHkgTEVBUCBUZXN0',
-    studentInfo: { name: 'Test Student', phone: '9999999999',
-                   email: 'test@test.com', course: 'Test',
-                   college: 'Test College', amount: 'Test' }
-  };
-  const result = handleUploadFile(testData);
+  const result = handleUploadFile({
+    token:    makeTestToken_('9811234567'),
+    docKey:   'pan',
+    fileName: 'test_file.pdf',
+    data:     Utilities.base64Encode('%PDF-1.4\n%Study LEAP test file\n'),
+    studentInfo: { name: 'Test Student', email: 'test@example.com', course: 'Test', college: 'Test College', amount: 'Test' }
+  });
   Logger.log('testUpload result: ' + JSON.stringify(result));
-  if (result.ok) {
-    Logger.log('\u2705 Drive upload works! File at: ' + result.url);
-    Logger.log('Folder: ' + result.folder);
-  } else {
-    Logger.log('\u274C Drive upload FAILED');
-  }
+  Logger.log(result.ok ? 'Drive upload works!' : 'Drive upload FAILED');
 }
 
 // ─── DRIVE HELPERS ────────────────────────────────────────────────────
