@@ -7,13 +7,15 @@
  *     (Apps Script) checks before accepting any upload. REQUIRES secret OTP_SECRET (same value
  *     must be saved in Apps Script > Project Settings > Script Properties as UPLOAD_SECRET).
  *   - Lead alerts now use the approved WhatsApp templates (studyleap_new_lead /
- *     studyleap_lead_reminder) and fall back to plain text if a template send fails.
+ *     studyleap_lead_reminde) and fall back to plain text if a template send fails.
  *   - Stricter phone validation (rejects 0000000000, 1234567890, 7-digit junk, bad Indian mobiles).
  *   - Origin check no longer accepts look-alike Referer hosts (exact origin match).
  *   - CRM secret comparison is constant-time and fails closed when CRM_SECRET is unset.
  *   - Telegram messages are sent as plain text (Markdown parsing broke on _ and * in names).
  *   - Duplicate lead (same phone within 10 min) is acknowledged but not re-notified;
  *     auto-reply email is limited to 1 per address per 24 h; sub-1.5s form fills are dropped.
+ *   - Turnstile now also protects /otp/send. TURNSTILE_REQUIRED="true" = strict (token mandatory,
+ *     verification errors block); unset = monitor mode (failures are logged, never block).
  *   Optional variables: WHATSAPP_OTP_TEMPLATE (default studyleap_otp2), WHATSAPP_LEAD_TEMPLATE,
  *     WHATSAPP_REMINDER_TEMPLATE, WHATSAPP_TEMPLATE_LANG (default en), WHATSAPP_TEMPLATES=off
  *     (to force plain-text alerts).
@@ -222,7 +224,7 @@ async function isRateLimited(ip, db) {
 }
 
 // ── Cloudflare Turnstile verification ─────────────────────────────────────
-async function verifyTurnstile(token, secret, remoteip) {
+async function verifyTurnstile(token, secret, remoteip, strict = false) {
   if (!secret) {
     console.warn('TURNSTILE_SECRET not set — skipping (dev mode)');
     return { success: true, skipped: true };
@@ -240,8 +242,28 @@ async function verifyTurnstile(token, secret, remoteip) {
     return await res.json();
   } catch (err) {
     console.error('Turnstile verify error:', err.message);
-    return { success: true, error: 'verify_fetch_failed' }; // fail open
+    return { success: !strict, error: 'verify_fetch_failed' }; // fail open unless strict mode
   }
+}
+
+// Decides whether a request passes the bot check.
+//  - TURNSTILE_REQUIRED = "true"  (strict): a valid token is mandatory; verification errors block.
+//  - otherwise (monitor mode): a missing/invalid token is logged but allowed, so a key or
+//    hostname mix-up in the dashboard can never stop real leads. Check the Worker logs for
+//    "[Turnstile] monitor" lines, then switch strict mode on.
+async function checkTurnstile(env, token, ip) {
+  const strict = env.TURNSTILE_REQUIRED === 'true';
+  if (strict && !env.TURNSTILE_SECRET) {
+    console.error('[Turnstile] strict mode is on but TURNSTILE_SECRET is not set');
+    return { ok: false, reason: 'not-configured' };
+  }
+  if (!token && !strict) return { ok: true, skipped: true };
+  const r = await verifyTurnstile(token, env.TURNSTILE_SECRET, ip, strict);
+  if (r.success) return { ok: true };
+  const why = r['error-codes'] || r.error;
+  if (!strict) { console.warn('[Turnstile] monitor mode - failed but allowed:', why); return { ok: true, monitored: true }; }
+  console.warn('[Turnstile] blocked:', why);
+  return { ok: false, reason: why };
 }
 
 // ── Validation ─────────────────────────────────────────────────────────────
@@ -544,7 +566,7 @@ async function handleFollowUpReminders(env) {
     ].filter(Boolean).join('\n');
 
     const waResult = await sendWhatsApp(env, waMsg, {
-      name: env.WHATSAPP_REMINDER_TEMPLATE || 'studyleap_lead_reminder',
+      name: env.WHATSAPP_REMINDER_TEMPLATE || 'studyleap_lead_reminde',
       params: [waitStr, lead.name, lead.phone, lead.city, lead.loanType || 'Not specified', lead.id],
     });
     if (!waResult.ok) {
@@ -614,13 +636,9 @@ async function handleFormSubmit(request, env, origin) {
   // Forms that show the Turnstile box always send a token, and it is verified.
   // Inner-page forms have no box yet, so a missing token is accepted unless the
   // Worker variable TURNSTILE_REQUIRED is set to "true" (strict mode).
-  const tsResult = (!turnstileToken && env.TURNSTILE_REQUIRED !== 'true')
-    ? { success: true, skipped: true }
-    : await verifyTurnstile(turnstileToken, env.TURNSTILE_SECRET, clientIP);
-  if (!tsResult.success) {
-    console.warn('Turnstile failed:', tsResult['error-codes'] || tsResult.error);
+  const ts = await checkTurnstile(env, turnstileToken, clientIP);
+  if (!ts.ok)
     return json({ ok: false, errors: ['Security check failed. Please refresh and try again.'] }, 403, origin);
-  }
 
   // ── 3. Validation ─────────────────────────────────────────────────────────
   const validationErrors = validateLead(emailParams);
@@ -908,6 +926,9 @@ async function handleOtpSend(request, env, origin) {
   let body;
   try { body = await request.json(); }
   catch { return json({ ok: false, error: 'Invalid JSON' }, 400, origin); }
+
+  const ts = await checkTurnstile(env, body.turnstileToken, ip);
+  if (!ts.ok) return json({ ok: false, error: 'Security check failed. Please refresh and try again.' }, 403, origin);
 
   const phone = String(body.phone || '').replace(/\D/g, '');
   if (!/^[6-9]\d{9}$/.test(phone) || isJunkNumber(phone))

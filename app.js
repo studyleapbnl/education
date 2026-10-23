@@ -9,7 +9,7 @@ const WORKER_URL = 'https://education.studyleapbnl.workers.dev';
 // ── Cloudflare Turnstile (spam protection) ────────────────────────────────
 // Site key of the Study LEAP widget (Cloudflare -> Turnstile). The matching SECRET key
 // must be added to the Worker as TURNSTILE_SECRET. Set this to '' to switch the check off.
-const TURNSTILE_SITE_KEY = '0x4AAAAAAFbX4UwSRUQCpF2o';
+const TURNSTILE_SITE_KEY = '0x4AAAAAAFgKteCHGoM2uIpw';
 
 // ── GA4 Form Funnel Tracking ──────────────────────────────────────────────
 function gaEvent(name, params = {}) {
