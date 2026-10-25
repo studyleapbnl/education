@@ -8,7 +8,7 @@
 (function () {
   'use strict';
   var SITE_KEY = '0x4AAAAAAFgKteCHGoM2uIpw';
-  var WORKER   = 'https://education.studyleapbnl.workers.dev';
+  var HOSTS    = window.SL_API_HOSTS || ['https://education.studyleapbnl.workers.dev'];
   if (!window.fetch || window.__slTsGuard) return;
   window.__slTsGuard = true;
   var nativeFetch = window.fetch.bind(window);
@@ -71,11 +71,22 @@
     }).catch(function () { return ''; });
   }
 
+  var spare = null;   // a token obtained for a request that failed before reaching the server
+  function acquire() {
+    if (spare && Date.now() - spare.at < 25000) { var t = spare.tok; spare = null; return Promise.resolve(t); }
+    spare = null;
+    return getToken();
+  }
+
   function needsToken(url, init) {
     if (!init || String(init.method || 'GET').toUpperCase() !== 'POST') return false;
-    if (url.indexOf(WORKER) !== 0) return false;
-    var path = url.slice(WORKER.length).split('?')[0];
-    return path === '' || path === '/' || path === '/otp/send';
+    for (var i = 0; i < HOSTS.length; i++) {
+      if (url.indexOf(HOSTS[i]) === 0) {
+        var path = url.slice(HOSTS[i].length).split('?')[0];
+        return path === '' || path === '/' || path === '/otp/send';
+      }
+    }
+    return false;
   }
 
   window.fetch = function (input, init) {
@@ -84,14 +95,19 @@
     var payload;
     try { payload = JSON.parse(init.body); } catch (e) { return nativeFetch(input, init); }
     if (!payload || typeof payload !== 'object' || payload.turnstileToken) return nativeFetch(input, init);
-    return getToken().then(function (tok) {
+    return acquire().then(function (tok) {
       payload.turnstileToken = tok;
       var next = {};
       for (var k in init) if (Object.prototype.hasOwnProperty.call(init, k)) next[k] = init[k];
       next.body = JSON.stringify(payload);
       // the page's own timeout started before the check ran; give the request a fresh one
       if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) next.signal = AbortSignal.timeout(15000);
-      return nativeFetch(input, next);
+      return nativeFetch(input, next).catch(function (err) {
+        // The request never reached the server, so the token is still unused: keep it for the
+        // automatic retry on the fallback host (avoids a second challenge for the visitor).
+        if (tok && !(err && err.name === 'AbortError')) spare = { tok: tok, at: Date.now() };
+        throw err;
+      });
     });
   };
 })();

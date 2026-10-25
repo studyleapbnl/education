@@ -4,7 +4,7 @@
 //  Worker as encrypted secrets — nothing
 //  secret is present in this file.
 // ══════════════════════════════════════════
-const WORKER_URL = 'https://education.studyleapbnl.workers.dev';
+// API host: see api.js (api.studyleap.in with automatic fallback)
 
 // ── Cloudflare Turnstile (spam protection) ────────────────────────────────
 // Site key of the Study LEAP widget (Cloudflare -> Turnstile). The matching SECRET key
@@ -180,7 +180,7 @@ async function submitToWorker(emailParams, telegramMessage, turnstileToken = '')
   let res;
   try {
     const hpVal = (document.getElementById('h-website') || document.getElementById('c-website') || {}).value || '';
-    res = await fetch(WORKER_URL, {
+    res = await slApiFetch('/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ emailParams, telegramMessage, honeypot: hpVal, turnstileToken, formOpenedAt: Math.round(performance.timeOrigin) }),

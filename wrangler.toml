@@ -32,6 +32,9 @@ crons = ["*/30 * * * *"]
 # dashboard only and is NOT listed here - secrets survive every deploy.
 [vars]
 WHATSAPP_RECIPIENTS = "918837693510"
+# Turnstile strict mode: uncomment ONLY after GET /admin/status says turnstile.readyForStrict = true
+# (see docs/RUNBOOK.md, section 4). It must live here (not only in the dashboard) so a deploy keeps it.
+# TURNSTILE_REQUIRED = "true"
 
 # ── Secrets (add via Dashboard → education → Settings) ────
 #

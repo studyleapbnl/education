@@ -16,6 +16,8 @@
  *     auto-reply email is limited to 1 per address per 24 h; sub-1.5s form fills are dropped.
  *   - Turnstile now also protects /otp/send. TURNSTILE_REQUIRED="true" = strict (token mandatory,
  *     verification errors block); unset = monitor mode (failures are logged, never block).
+ *   v6.1: only whitelisted form fields are accepted (others dropped); Telegram/WhatsApp alert text is
+ *     built on the server (client text ignored); public endpoints reject bodies over 32 KB (413).
  *   Optional variables: WHATSAPP_OTP_TEMPLATE (default studyleap_otp2), WHATSAPP_LEAD_TEMPLATE,
  *     WHATSAPP_REMINDER_TEMPLATE, WHATSAPP_TEMPLATE_LANG (default en), WHATSAPP_TEMPLATES=off
  *     (to force plain-text alerts).
@@ -184,6 +186,31 @@ function waParam(v, max = 200) {
   const t = String(v ?? '').replace(/[\r\n\t]+/g, ' ').replace(/ {4,}/g, '   ').trim().slice(0, max);
   return t || '-';
 }
+// Public endpoints: read the body with a hard size cap (32 KB) before parsing.
+const MAX_BODY_BYTES = 32 * 1024;
+async function readJsonLimited(request, max = MAX_BODY_BYTES) {
+  const declared = Number(request.headers.get('Content-Length') || 0);
+  if (declared > max) return { ok: false, status: 413 };
+  let text;
+  try { text = await request.text(); } catch { return { ok: false, status: 400 }; }
+  if (text.length > max) return { ok: false, status: 413 };
+  try { return { ok: true, data: JSON.parse(text) }; } catch { return { ok: false, status: 400 }; }
+}
+// Only these form fields are accepted from the browser; everything else is dropped.
+const ALLOWED_PARAM_KEYS = ['Full Name', 'Phone', 'Email', 'City', 'Course', 'Date', 'Loan Amount', 'Loan Type',
+  'Message', 'Source', 'Submitted At', 'Destination', 'Business Name', 'Business Type', 'Contact Name'];
+function pickParams(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  const dropped = [];
+  for (const k of Object.keys(raw)) {
+    if (!ALLOWED_PARAM_KEYS.includes(k)) { dropped.push(k.slice(0, 40)); continue; }
+    const v = raw[k];
+    if (typeof v === 'string' || typeof v === 'number') out[k] = String(v).slice(0, 2000);
+  }
+  if (dropped.length) console.warn('[Lead] ignored unexpected fields:', dropped.slice(0, 10).join(', '));
+  return out;
+}
 // Telegram: strip WhatsApp-style *bold* / _italic_ markers and send as plain text.
 function toPlain(msg) {
   return String(msg || '').replace(/\*([^*\n]+)\*/g, '$1').replace(/^_(.*)_$/gm, '$1');
@@ -255,15 +282,36 @@ async function checkTurnstile(env, token, ip) {
   const strict = env.TURNSTILE_REQUIRED === 'true';
   if (strict && !env.TURNSTILE_SECRET) {
     console.error('[Turnstile] strict mode is on but TURNSTILE_SECRET is not set');
+    await recordTs(env, 'blocked');
     return { ok: false, reason: 'not-configured' };
   }
-  if (!token && !strict) return { ok: true, skipped: true };
+  if (!token && !strict) { await recordTs(env, 'no_token'); return { ok: true, skipped: true }; }
   const r = await verifyTurnstile(token, env.TURNSTILE_SECRET, ip, strict);
-  if (r.success) return { ok: true };
+  if (r.success) { await recordTs(env, 'verified'); return { ok: true }; }
   const why = r['error-codes'] || r.error;
-  if (!strict) { console.warn('[Turnstile] monitor mode - failed but allowed:', why); return { ok: true, monitored: true }; }
+  if (!strict) {
+    console.warn('[Turnstile] monitor mode - failed but allowed:', why);
+    await recordTs(env, 'monitor_failed');
+    return { ok: true, monitored: true };
+  }
   console.warn('[Turnstile] blocked:', why);
+  await recordTs(env, 'blocked');
   return { ok: false, reason: why };
+}
+
+// Daily counters of Turnstile outcomes, shown by GET /admin/status so you can see when it is
+// safe to switch strict mode on. Best effort: never breaks a request.
+let _tsTableReady = false;
+async function recordTs(env, outcome) {
+  try {
+    if (!env.DB) return;
+    if (!_tsTableReady) {
+      await env.DB.prepare('CREATE TABLE IF NOT EXISTS ts_events (day TEXT NOT NULL, outcome TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, outcome))').run();
+      _tsTableReady = true;
+    }
+    const day = new Date().toISOString().slice(0, 10);
+    await env.DB.prepare('INSERT INTO ts_events (day, outcome, n) VALUES (?,?,1) ON CONFLICT(day, outcome) DO UPDATE SET n = n + 1').bind(day, outcome).run();
+  } catch (err) { console.warn('recordTs skipped:', err.message); }
 }
 
 // ── Validation ─────────────────────────────────────────────────────────────
@@ -447,6 +495,7 @@ export default {
     }
 
     if (method === 'POST'   && url.pathname === '/indexnow')       return handleIndexNow(request, env, origin);
+    if (method === 'GET'    && url.pathname === '/admin/status')   return handleAdminStatus(request, env);
     if (method === 'GET'    && url.pathname === '/leads')          return handleGetLeads(request, env, origin);
     if (method === 'PATCH'  && url.pathname.startsWith('/leads/')) return handleUpdateLead(request, env, url.pathname.split('/')[2], origin);
     if (method === 'DELETE' && url.pathname.startsWith('/leads/')) return handleDeleteLead(request, env, url.pathname.split('/')[2], origin);
@@ -612,16 +661,18 @@ async function handleFormSubmit(request, env, origin) {
   if (await isRateLimited(clientIP, env.DB))
     return json({ ok: false, errors: ['Too many submissions. Try again in 10 minutes.'] }, 429, origin);
 
-  let body;
-  try { body = await request.json(); }
-  catch { return json({ ok: false, errors: ['Invalid JSON body'] }, 400, origin); }
+  const parsed = await readJsonLimited(request);
+  if (!parsed.ok)
+    return json({ ok: false, errors: [parsed.status === 413 ? 'Request too large' : 'Invalid JSON body'] }, parsed.status, origin);
+  const body = parsed.data && typeof parsed.data === 'object' ? parsed.data : {};
 
   const {
-    emailParams     = {},
-    telegramMessage = '',
+    emailParams: rawParams = {},
     honeypot        = '',
     turnstileToken  = '',
   } = body;
+  // Only known form fields are used; client-supplied free-text alert messages are ignored.
+  const emailParams = pickParams(rawParams);
 
   // ── 1. Honeypot ───────────────────────────────────────────────────────────
   if (honeypot && honeypot.trim().length > 0)
@@ -705,7 +756,7 @@ async function handleFormSubmit(request, env, origin) {
   // their result to Cloudflare's real-time logs (Worker → Logs) so a failure
   // is visible immediately instead of only inside this response's `errors`.
   const waMessage = buildWhatsAppMessage(lead);
-  const tgMessage = telegramMessage || waMessage;
+  const tgMessage = waMessage;   // built on the server from validated fields only
 
   const [waResult, tgResult] = await Promise.all([
     sendWhatsApp(env, waMessage, {
@@ -923,9 +974,9 @@ async function handleOtpSend(request, env, origin) {
   if (await hitLimit(env.DB, 'otp-ip:' + ip, 10, 15 * 60 * 1000))
     return json({ ok: false, error: 'Too many requests. Please try again later.' }, 429, origin);
 
-  let body;
-  try { body = await request.json(); }
-  catch { return json({ ok: false, error: 'Invalid JSON' }, 400, origin); }
+  const parsed = await readJsonLimited(request, 4096);
+  if (!parsed.ok) return json({ ok: false, error: parsed.status === 413 ? 'Request too large' : 'Invalid JSON' }, parsed.status, origin);
+  const body = parsed.data && typeof parsed.data === 'object' ? parsed.data : {};
 
   const ts = await checkTurnstile(env, body.turnstileToken, ip);
   if (!ts.ok) return json({ ok: false, error: 'Security check failed. Please refresh and try again.' }, 403, origin);
@@ -972,9 +1023,9 @@ async function handleOtpVerify(request, env, origin) {
   if (await hitLimit(env.DB, 'otp-v-ip:' + ip, 30, 15 * 60 * 1000))
     return json({ ok: false, error: 'Too many requests. Please try again later.' }, 429, origin);
 
-  let body;
-  try { body = await request.json(); }
-  catch { return json({ ok: false, error: 'Invalid JSON' }, 400, origin); }
+  const parsed = await readJsonLimited(request, 4096);
+  if (!parsed.ok) return json({ ok: false, error: parsed.status === 413 ? 'Request too large' : 'Invalid JSON' }, parsed.status, origin);
+  const body = parsed.data && typeof parsed.data === 'object' ? parsed.data : {};
 
   const phone = String(body.phone || '').replace(/\D/g, '');
   const code  = String(body.code  || '').trim();
@@ -1007,4 +1058,55 @@ async function handleOtpVerify(request, env, origin) {
   const exp   = now + 60 * 60 * 1000;                       // token valid for 60 minutes
   const sig   = await hmacHex(env.OTP_SECRET, `${phone}.${exp}`);
   return json({ ok: true, token: `${phone}.${exp}.${sig}`, expiresAt: exp }, 200, origin);
+}
+
+// -- GET /admin/status  (needs the X-CRM-Secret header; reveals no secret values) ----------------
+async function handleAdminStatus(request, env) {
+  if (!authOk(request, env)) return json({ ok: false, error: 'Unauthorized' }, 401);
+  const has = (v) => Boolean(v);
+  let turnstile = { last24h: {}, last7d: {} }, leads = { total: null, last24h: null };
+  try {
+    await env.DB.prepare('CREATE TABLE IF NOT EXISTS ts_events (day TEXT NOT NULL, outcome TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, outcome))').run();
+    const today = new Date().toISOString().slice(0, 10);
+    const weekAgo = new Date(Date.now() - 6 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const rows = (await env.DB.prepare('SELECT day, outcome, n FROM ts_events WHERE day >= ?').bind(weekAgo).all()).results || [];
+    for (const r of rows) {
+      turnstile.last7d[r.outcome] = (turnstile.last7d[r.outcome] || 0) + r.n;
+      if (r.day === today) turnstile.last24h[r.outcome] = (turnstile.last24h[r.outcome] || 0) + r.n;
+    }
+    const total = await env.DB.prepare('SELECT COUNT(*) AS c FROM leads').first();
+    const recent = await env.DB.prepare('SELECT COUNT(*) AS c FROM leads WHERE createdAt >= ?').bind(new Date(Date.now() - 24 * 3600 * 1000).toISOString()).first();
+    leads = { total: total?.c ?? null, last24h: recent?.c ?? null };
+  } catch (err) { console.warn('admin status db read failed:', err.message); }
+  const week = turnstile.last7d;
+  const strict = env.TURNSTILE_REQUIRED === 'true';
+  const verified = week.verified || 0, failed = week.monitor_failed || 0;
+  let recommendation;
+  if (strict) recommendation = 'Strict mode is ON. Watch "blocked" - if real visitors are being blocked, remove TURNSTILE_REQUIRED.';
+  else if (!has(env.TURNSTILE_SECRET)) recommendation = 'Set TURNSTILE_SECRET first.';
+  else if (failed > 0) recommendation = 'NOT ready: some tokens failed verification in monitor mode. Check the site key / secret pair and the widget hostnames.';
+  else if (verified < 3) recommendation = 'Not enough data yet: submit each form (home, contact, B2B, upload OTP) at least once, then check again.';
+  else recommendation = 'Ready: tokens verify cleanly. You can enable strict mode (TURNSTILE_REQUIRED = "true").';
+  return json({
+    ok: true,
+    version: '6.2',
+    time: new Date().toISOString(),
+    config: {
+      otpSecretSet: has(env.OTP_SECRET),
+      crmSecretSet: has(env.CRM_SECRET),
+      turnstile: { secretSet: has(env.TURNSTILE_SECRET), mode: strict ? 'strict' : 'monitor' },
+      whatsapp: {
+        configured: has(env.WHATSAPP_TOKEN) && has(env.WHATSAPP_PHONE_ID),
+        recipients: env.WHATSAPP_RECIPIENTS ? env.WHATSAPP_RECIPIENTS.split(',').filter(Boolean).length : 0,
+        templatesEnabled: env.WHATSAPP_TEMPLATES !== 'off',
+        leadTemplate: env.WHATSAPP_LEAD_TEMPLATE || 'studyleap_new_lead',
+        reminderTemplate: env.WHATSAPP_REMINDER_TEMPLATE || 'studyleap_lead_reminde',
+        otpTemplate: env.WHATSAPP_OTP_TEMPLATE || 'studyleap_otp2',
+      },
+      emailjsConfigured: has(env.EMAILJS_SERVICE_ID) && has(env.EMAILJS_TEMPLATE_ID) && has(env.EMAILJS_PUBLIC_KEY) && has(env.EMAILJS_PRIVATE_KEY),
+      telegramConfigured: has(env.TELEGRAM_BOT_TOKEN) && has(env.TELEGRAM_CHAT_ID),
+    },
+    turnstile: { ...turnstile, readyForStrict: !strict && has(env.TURNSTILE_SECRET) && failed === 0 && verified >= 3, recommendation },
+    leads,
+  }, 200);
 }

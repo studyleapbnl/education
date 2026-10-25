@@ -1,6 +1,6 @@
 // ======================================================================
 //  Study LEAP - Google Apps Script  (Code.gs)
-//  VERSION 4 - token-protected uploads, validated files, no public OTP
+//  VERSION 4.2 - token-protected uploads, consent required, validated files, e-mail alerts on failures
 // ======================================================================
 //
 //  SECURITY MODEL (v4)
@@ -39,8 +39,8 @@ function doGet(e) {
 
 // --- doPost: uploads + summary (token required) ------------------------
 function doPost(e) {
+  let data = null;
   try {
-    let data;
     if (e.parameter && e.parameter.data)        data = JSON.parse(e.parameter.data);   // form POST from browser
     else if (e.postData && e.postData.contents) data = JSON.parse(e.postData.contents);
     else                                        data = e.parameter || {};
@@ -52,8 +52,31 @@ function doPost(e) {
     return jsonOut(result);
   } catch (err) {
     Logger.log('doPost ERROR: ' + err.message);
+    // Normal rejections (bad token, wrong file type, rate limit...) are not alerts.
+    // Anything else (Drive full, missing secret, quota, bug) e-mails the team - max 3 per hour.
+    if (!isExpectedError_(err.message)) alertAdmin_(data && data.action ? data.action : 'unknown', err);
     return jsonOut({ ok: false, error: err.message });
   }
+}
+
+var EXPECTED_ERRORS_ = [/not verified/i, /verification expired/i, /Consent is required/, /Unknown document/, /too large/i,
+  /Only PDF/, /Too many requests/, /No file data/, /Unknown action/];
+function isExpectedError_(msg) {
+  msg = String(msg || '');
+  return EXPECTED_ERRORS_.some(function (re) { return re.test(msg); });
+}
+function alertAdmin_(what, err) {
+  try {
+    bump_('admin-alert', 3, 3600);
+    GmailApp.sendEmail(NOTIFY_EMAIL, '[Study LEAP] Upload service problem (' + what + ')',
+      'The document-upload service hit an unexpected error.\n\n' +
+      'Action: ' + what + '\n' +
+      'Error:  ' + String(err && err.message ? err.message : err).slice(0, 300) + '\n' +
+      'Time:   ' + new Date().toISOString() + '\n\n' +
+      'Common causes: Google Drive storage full or folder permissions changed, Script Property UPLOAD_SECRET\n' +
+      'missing, or the daily Apps Script / Gmail quota reached.\n' +
+      'Details: Apps Script editor > Executions (no student data is included in this e-mail).');
+  } catch (e) { Logger.log('alertAdmin_ skipped: ' + e.message); }
 }
 
 // --- TOKEN + VALIDATION HELPERS ---------------------------------------
@@ -87,6 +110,11 @@ function bump_(key, max, ttlSec) {
   const n = Number(cache.get(key) || 0) + 1;
   if (n > max) throw new Error('Too many requests. Please try again later.');
   cache.put(key, String(n), ttlSec);
+}
+// Documents may only be uploaded after the person ticked the consent box on the upload page.
+function requireConsent_(data) {
+  if (!data.consent || data.consent.docs !== true) throw new Error('Consent is required to upload documents');
+  return { at: clean_(data.consent.at, 40), v: clean_(data.consent.v, 20) };
 }
 function sniffMime_(bytes) {
   function b(i) { return bytes[i] === undefined ? -1 : (bytes[i] + 256) % 256; }
@@ -126,6 +154,7 @@ function sanitizeInfo_(si, phone) {
 // --- UPLOAD FILE ------------------------------------------------------
 function handleUploadFile(data) {
   const phone = verifyToken_(data.token);
+  requireConsent_(data);
   if (!data.data || typeof data.data !== 'string') throw new Error('No file data in request');
   if (ALLOWED_DOC_KEYS.indexOf(data.docKey) < 0)   throw new Error('Unknown document type');
   if (data.data.length > Math.ceil(MAX_FILE_BYTES * 4 / 3) + 16) throw new Error('File too large (max 10 MB)');
@@ -147,8 +176,15 @@ function handleUploadFile(data) {
 // --- SEND SUMMARY EMAIL -----------------------------------------------
 function handleSendSummary(data) {
   const phone = verifyToken_(data.token);              // must have passed WhatsApp OTP
+  const consent = requireConsent_(data);               // and ticked the consent box
   bump_('sum:' + phone, MAX_SUMMARIES_PER_HOUR, 3600);
   const si   = sanitizeInfo_(data.studentInfo, phone);
+  // The student's e-mail address is typed by the visitor and not verified: send at most one
+  // confirmation per address per day so this cannot be used to mail strangers repeatedly.
+  if (si.email) {
+    try { bump_('se:' + hmacHex_(getSecret_(), si.email.toLowerCase()), 1, 86400); }
+    catch (e) { si.email = ''; Logger.log('Student confirmation skipped (daily limit for this address)'); }
+  }
   const uploaded = (Array.isArray(data.docsUploaded) ? data.docsUploaded : [])
     .filter(function (k) { return ALLOWED_DOC_KEYS.indexOf(k) >= 0; });
   data = { docsUploaded: uploaded };
@@ -177,6 +213,7 @@ function handleSendSummary(data) {
     'Annual Income:' + (si.coIncome     || 'Not provided') + '\n\n' +
     '── DOCUMENTS UPLOADED ──\n' +
     docs + '\n\n' +
+    'Consent given: documents' + (consent.at ? ' at ' + consent.at : '') + (consent.v ? ' (notice v' + consent.v + ')' : '') + '\n' +
     'View in Drive: ' + folderUrl
   );
 
@@ -283,6 +320,7 @@ function handleSendSummary(data) {
         '<a href="https://www.studyleap.in" style="color:#0048A8;text-decoration:none;">www.studyleap.in</a> | ' +
         '<a href="mailto:support@studyleap.in" style="color:#0048A8;text-decoration:none;">support@studyleap.in</a>' +
         '</p>' +
+        '<p style="margin:14px 0 0;color:#94a3b8;font-size:11px;line-height:1.5;">You received this because documents were submitted on studyleap.in using this e-mail address. If that was not you, please ignore this message or write to support@studyleap.in.</p>' +
         '</td></tr>' +
 
         '</table></td></tr></table></body></html>';
@@ -297,7 +335,8 @@ function handleSendSummary(data) {
         'Loan Amount: ' + (si.amount || '') + '\n\n' +
         'Our team will contact you within 24-48 hours.\n\n' +
         'WhatsApp: +91 88376 93510\n' +
-        'Team Study LEAP | www.studyleap.in',
+        'Team Study LEAP | www.studyleap.in\n\n' +
+        'You received this because documents were submitted on studyleap.in using this e-mail address. If that was not you, please ignore this message.',
         { htmlBody: htmlBody }
       );
       Logger.log('✅ HTML confirmation email sent to student: ' + si.email + ' | Ref: ' + refId);
@@ -317,6 +356,9 @@ function makeTestToken_(phone) {
   return phone + '.' + exp + '.' + hmacHex_(getSecret_(), phone + '.' + exp);
 }
 
+// Sends a sample alert e-mail so you can confirm alerts reach the team inbox.
+function testAlert() { alertAdmin_('testAlert', new Error('This is only a test alert - nothing is wrong.')); }
+
 // Run first: confirms UPLOAD_SECRET is set and token checking works.
 function testToken() {
   const tok = makeTestToken_('9811234567');
@@ -330,6 +372,7 @@ function testToken() {
 function testUpload() {
   const result = handleUploadFile({
     token:    makeTestToken_('9811234567'),
+    consent:  { docs: true, at: new Date().toISOString(), v: 'test' },
     docKey:   'pan',
     fileName: 'test_file.pdf',
     data:     Utilities.base64Encode('%PDF-1.4\n%Study LEAP test file\n'),

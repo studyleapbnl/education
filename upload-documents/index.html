@@ -2,6 +2,7 @@
 <html lang="en" prefix="og: https://ogp.me/ns#">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="script-src-elem 'self' https://cdn.jsdelivr.net https://www.clarity.ms https://scripts.clarity.ms https://www.googletagmanager.com https://maps.googleapis.com https://api.emailjs.com https://challenges.cloudflare.com 'sha256-1z+5YOqT4B6t1ghWEsDnovQxrgVP3EFIQKF8vs/FGpI=' 'sha256-Sd0UVVK/2wO46OxLt0wFc9bkzsHhut6kFiXAiMZ2aWo=' 'sha256-jSQAwptmkDtyZtVuN/M2biKZA8WdJd4YbfOVtl0UCVI='; script-src-attr 'unsafe-inline'">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Upload Loan Documents | Study LEAP</title>
 <meta name="description" content="Securely upload your education loan documents to Study LEAP. Submit Aadhaar, marksheets, income proof, and more — verified with OTP for your safety.">
@@ -294,6 +295,11 @@ input.error { border-color: #EF4444; }
   .stepper { gap: 0; }
   .step-label { font-size: 0.65rem; }
 }
+
+.consent-row { display:flex; gap:10px; align-items:flex-start; font-size:0.85rem; line-height:1.55; margin:1.1rem 0; color:var(--gray-600); cursor:pointer; }
+.consent-row input { margin-top:3px; width:18px; height:18px; flex:0 0 auto; cursor:pointer; }
+.consent-row a { color:var(--blue); text-decoration:underline; }
+.consent-row.error { outline:2px solid #DC2626; outline-offset:4px; border-radius:6px; }
 </style>
 <!-- ══ GA4 — ACTIVE | Measurement ID: G-ZXTYQ0BLNL | www.studyleap.in ══ -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZXTYQ0BLNL"></script>
@@ -305,6 +311,7 @@ input.error { border-color: #EF4444; }
 </script>
 <style>/* v6: stop iOS Safari zooming into form fields */@media (max-width:768px){input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),select,textarea{font-size:16px !important}}</style>
 <script src="/ts-guard.js?v=6" defer></script>
+<script src="/api.js?v=6"></script>
 </head>
 <body><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="display:none" aria-hidden="true"><defs><symbol id="ic-banknote" viewBox="0 0 24 24"><rect width="20" height="12" x="2" y="6" rx="2" /> <circle cx="12" cy="12" r="2" /> <path d="M6 12h.01M18 12h.01" /></symbol><symbol id="ic-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol><symbol id="ic-clipboard-list" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /></symbol><symbol id="ic-credit-card" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="5" rx="2" /> <line x1="2" x2="22" y1="10" y2="10" /></symbol><symbol id="ic-file-text" viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></symbol><symbol id="ic-graduation-cap" viewBox="0 0 24 24"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z" /> <path d="M22 10v6" /> <path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5" /></symbol><symbol id="ic-id-card" viewBox="0 0 24 24"><path d="M16 10h2" /> <path d="M16 14h2" /> <path d="M6.17 15a3 3 0 0 1 5.66 0" /> <circle cx="9" cy="11" r="2" /> <rect x="2" y="5" width="20" height="14" rx="2" /></symbol><symbol id="ic-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></symbol><symbol id="ic-landmark" viewBox="0 0 24 24"><path d="M10 18v-7" /> <path d="M11.119 2.205a2 2 0 0 1 1.762 0l7.84 3.846A.5.5 0 0 1 20.5 7h-17a.5.5 0 0 1-.22-.949z" /> <path d="M14 18v-7" /> <path d="M18 18v-7" /> <path d="M3 22h18" /> <path d="M6 18v-7" /></symbol><symbol id="ic-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /> <path d="M7 11V7a5 5 0 0 1 10 0v4" /></symbol><symbol id="ic-mail" viewBox="0 0 24 24"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" /> <rect x="2" y="4" width="20" height="16" rx="2" /></symbol><symbol id="ic-paperclip" viewBox="0 0 24 24"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551" /></symbol><symbol id="ic-party-popper" viewBox="0 0 24 24"><path d="M5.8 11.3 2 22l10.7-3.79" /> <path d="M4 3h.01" /> <path d="M22 8h.01" /> <path d="M15 2h.01" /> <path d="M22 20h.01" /> <path d="m22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10" /> <path d="m22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11c-.11.7-.72 1.22-1.43 1.22H17" /> <path d="m11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7" /> <path d="M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z" /></symbol><symbol id="ic-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></symbol><symbol id="ic-plane" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" /></symbol><symbol id="ic-smartphone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /> <path d="M12 18h.01" /></symbol><symbol id="ic-triangle-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol><symbol id="ic-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /> <path d="M16 3.128a4 4 0 0 1 0 7.744" /> <path d="M22 21v-2a4 4 0 0 0-3-3.87" /> <circle cx="9" cy="7" r="4" /></symbol><symbol id="ic-x" viewBox="0 0 24 24"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol><symbol id="ic-handshake" viewBox="0 0 24 24"><path d="m11 17 2 2a1 1 0 1 0 3-3" /> <path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4" /> <path d="m21 3 1 11h-2" /> <path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3" /> <path d="M3 4h8" /></symbol></defs></svg>
 
@@ -359,8 +366,10 @@ input.error { border-color: #EF4444; }
 
         <div class="info-box">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-          <span>Your mobile number is used only for verification and to link your documents to your application. We never share it.</span>
+          <span>Your mobile number is used only for verification and to link your documents to your application. It is not used for anything else.</span>
         </div>
+
+        <label class="consent-row" id="consentOTPRow" for="consentOTP"><input type="checkbox" id="consentOTP"><span>I agree to Study LEAP using my mobile number to verify my identity and to contact me about my loan documents, as explained in the <a href="/privacy-policy/" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
 
         <div class="field-group">
           <label class="field-label">Mobile Number <span class="req">*</span></label>
@@ -417,7 +426,7 @@ input.error { border-color: #EF4444; }
         <div class="field-row">
           <div class="field-group">
             <label class="field-label">Loan Amount Required <span class="req">*</span></label>
-            <select id="loanAmount">
+            <select id="loanAmount" aria-label="Loan Amount Required">
               <option value="">Select range</option>
               <option>Up to ₹5 Lakhs</option>
               <option>₹5 – 10 Lakhs</option>
@@ -439,7 +448,7 @@ input.error { border-color: #EF4444; }
             </div>
             <div class="field-group">
               <label class="field-label">Relationship</label>
-              <select id="coRelation">
+              <select id="coRelation" aria-label="Relationship">
                 <option value="">Select</option>
                 <option>Father</option>
                 <option>Mother</option>
@@ -452,7 +461,7 @@ input.error { border-color: #EF4444; }
           <div class="field-row">
             <div class="field-group">
               <label class="field-label">Co-Applicant Occupation</label>
-              <select id="coOccupation">
+              <select id="coOccupation" aria-label="Co-Applicant Occupation">
                 <option value="">Select</option>
                 <option>Salaried</option>
                 <option>Self-employed / Business</option>
@@ -463,7 +472,7 @@ input.error { border-color: #EF4444; }
             </div>
             <div class="field-group">
               <label class="field-label">Annual Income (Approx.)</label>
-              <select id="coIncome">
+              <select id="coIncome" aria-label="Annual Income (Approx.)">
                 <option value="">Select range</option>
                 <option>Below ₹2 Lakhs</option>
                 <option>₹2 – 5 Lakhs</option>
@@ -480,7 +489,7 @@ input.error { border-color: #EF4444; }
             </div>
             <div class="field-group">
               <label class="field-label">Preferred Bank / NBFC</label>
-              <select id="prefBank">
+              <select id="prefBank" aria-label="Preferred Bank / NBFC">
                 <option value="">No preference</option>
                 <option>SBI</option>
                 <option>HDFC Credila</option>
@@ -512,7 +521,7 @@ input.error { border-color: #EF4444; }
 
         <div class="info-box">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-          <span>All files are uploaded directly to our private, encrypted Google Drive folder. Only our team can access them.</span>
+          <span>All files are uploaded directly to a private Google Drive folder. Only the Study LEAP team can access them.</span>
         </div>
 
         <div class="doc-grid" id="docGrid">
@@ -522,7 +531,7 @@ input.error { border-color: #EF4444; }
             <div class="doc-req-badge">Required</div>
             <div class="doc-icon"><span class="ic ic-id-card" aria-hidden="true"><svg class="ic-svg" viewBox="0 0 24 24"><use xlink:href="#ic-id-card" href="#ic-id-card"></use></svg></span></div>
             <div class="doc-name">Aadhaar Card</div>
-            <div class="doc-hint">Front &amp; back (single PDF)</div>
+            <div class="doc-hint">Front &amp; back (single PDF). A masked copy (last 4 digits only) is fine.</div>
             <div class="doc-status" id="ds_aadhaar">Click to upload (max 10 MB)</div>
             <button class="doc-upload-btn" onclick="document.getElementById('f_aadhaar').click()">Choose File</button>
           
@@ -655,6 +664,8 @@ input.error { border-color: #EF4444; }
 
         </div>
 
+        <label class="consent-row" id="consentDocsRow" for="consentDocs"><input type="checkbox" id="consentDocs"><span>I consent to Study LEAP collecting and using the documents I upload, which may include my Aadhaar, PAN and income details, only to assess my education loan application and to share with the banks or lenders I choose to apply to. I can ask for correction or deletion of my documents, subject to legal retention rules, by writing to <a href="mailto:support@studyleap.in">support@studyleap.in</a>. How long documents are kept is explained in the <a href="/privacy-policy/" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
+
         <div class="upload-progress" id="uploadProgress">
           <div class="progress-label">
             <span>Uploading to Drive…</span>
@@ -702,7 +713,7 @@ input.error { border-color: #EF4444; }
       </div>
       <div class="sec-badge">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        DPDP Compliant
+        Consent-based &amp; private
       
             <img class="doc-preview" id="prev_other" alt="preview">
             <div class="doc-preview-pdf" id="prevpdf_other"><span class="ic ic-file-text" aria-hidden="true"><svg class="ic-svg" viewBox="0 0 24 24"><use xlink:href="#ic-file-text" href="#ic-file-text"></use></svg></span> PDF selected</div>
@@ -725,6 +736,7 @@ const STATE = {
   otpVerified: false,
   uploadToken: '',      // signed token returned by the server after a successful OTP check
   tokenExp: 0,
+  consent: null,        // { docs:true, at, v } recorded when the person ticks the documents consent box
   timerInterval: null,
   timerSeconds: 0,
   files: {},
@@ -748,10 +760,10 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbylJlQYotxW37iF
 
 // ─── OTP SEND ────────────────────────────────────────────────────────────────
 // OTP is generated, sent (WhatsApp) and verified by the server. The browser never sees the code.
-const WORKER_URL = 'https://education.studyleapbnl.workers.dev';
+// API host: see api.js (api.studyleap.in with automatic fallback)
 
 async function requestOTP(phone) {
-  const res = await fetch(WORKER_URL + '/otp/send', {
+  const res = await slApiFetch('/otp/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ phone })
@@ -767,6 +779,13 @@ async function requestOTP(phone) {
 }
 
 async function sendOTP() {
+  const otpConsent = document.getElementById('consentOTP');
+  if (!otpConsent || !otpConsent.checked) {
+    showToast('Please tick the consent box to continue', 'error');
+    document.getElementById('consentOTPRow').classList.add('error');
+    return;
+  }
+  document.getElementById('consentOTPRow').classList.remove('error');
   const phone = document.getElementById('phoneInput').value.trim();
   if (!/^[6-9]\d{9}$/.test(phone)) {
     showToast('Please enter a valid 10-digit mobile number', 'error');
@@ -844,7 +863,7 @@ async function verifyOTP() {
   verifyBtn.disabled = true;
 
   try {
-    const res = await fetch(WORKER_URL + '/otp/verify', {
+    const res = await slApiFetch('/otp/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone: STATE.phone, code: entered })
@@ -992,6 +1011,16 @@ function fileChosen(input, docKey) {
 
 // ─── SUBMIT DOCUMENTS ─────────────────────────────────────────────────────────
 async function submitDocuments() {
+  const docsConsent = document.getElementById('consentDocs');
+  if (!docsConsent || !docsConsent.checked) {
+    showToast('Please tick the consent box before uploading your documents', 'error');
+    const row = document.getElementById('consentDocsRow');
+    row.classList.add('error');
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  document.getElementById('consentDocsRow').classList.remove('error');
+  STATE.consent = { docs: true, at: new Date().toISOString(), v: '2026-10' };
   const missing = REQUIRED_DOCS.filter(k => !STATE.files[k]);
   if (missing.length > 0) {
     const labels = { aadhaar:'Aadhaar', pan:'PAN Card', tenth:'10th Marksheet',
@@ -1072,6 +1101,7 @@ async function uploadAllToDrive() {
     await postWithRetry({
       action:      'uploadFile',
       token:       STATE.uploadToken,
+      consent:     STATE.consent,
       docKey:      key,
       fileName:    file.name,
       mimeType:    mimeType,
@@ -1089,6 +1119,7 @@ async function uploadAllToDrive() {
   await postWithRetry({
     action:       'sendSummary',
     token:        STATE.uploadToken,
+    consent:      STATE.consent,
     studentInfo:  STATE.studentInfo,
     docsUploaded: Object.keys(STATE.files)
   });
