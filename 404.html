@@ -2,7 +2,7 @@
 <html lang="en-IN">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="script-src-elem 'self' https://cdn.jsdelivr.net https://www.clarity.ms https://scripts.clarity.ms https://www.googletagmanager.com https://maps.googleapis.com https://api.emailjs.com https://challenges.cloudflare.com 'sha256-Sd0UVVK/2wO46OxLt0wFc9bkzsHhut6kFiXAiMZ2aWo=' 'sha256-isJ6nefYY9jnuSKOEBmiO11IgwnzitZgrUfdbaMOifw=' 'sha256-jSQAwptmkDtyZtVuN/M2biKZA8WdJd4YbfOVtl0UCVI='; script-src-attr 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="script-src-elem 'self' https://cdn.jsdelivr.net https://www.clarity.ms https://scripts.clarity.ms https://www.googletagmanager.com https://maps.googleapis.com https://api.emailjs.com https://challenges.cloudflare.com 'sha256-Sd0UVVK/2wO46OxLt0wFc9bkzsHhut6kFiXAiMZ2aWo=' 'sha256-jSQAwptmkDtyZtVuN/M2biKZA8WdJd4YbfOVtl0UCVI=' 'sha256-m+Ws7zvUzNYytmtnWJeMFTSO2ulOrDGFMpLE7QghyD8='; script-src-attr 'unsafe-inline'">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Page Not Found – Study LEAP</title>
 <meta name="robots" content="noindex, nofollow">
@@ -37,9 +37,13 @@
 <!-- Tag ID: z0ihjnvf64 -->
 <script>
   (function(c,l,a,r,i,t,y){
-    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    function start(){ if(c.__clarityStarted) return; c.__clarityStarted=1;
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y); }
+    // start after the visitor first interacts, or after 10 s - keeps it off the critical page load
+    ['pointerdown','keydown','touchstart','scroll'].forEach(function(e){ addEventListener(e,start,{once:true,passive:true}); });
+    setTimeout(start,10000);
   })(window, document, "clarity", "script", "z0ihjnvf64");
 </script>
 <style>/* v6: stop iOS Safari zooming into form fields */@media (max-width:768px){input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),select,textarea{font-size:16px !important}}</style>

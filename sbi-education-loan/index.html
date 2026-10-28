@@ -10,7 +10,7 @@
     gtag('config', 'G-ZXTYQ0BLNL');
   </script>
   <!-- End Google Analytics -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.clarity.ms https://maps.googleapis.com https://api.emailjs.com https://www.googletagmanager.com https://scripts.clarity.ms; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://education.studyleapbnl.workers.dev https://api.telegram.org https://api.emailjs.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://*.clarity.ms; frame-src https://maps.google.com; object-src 'none'; base-uri 'self'; script-src-elem 'self' https://cdn.jsdelivr.net https://www.clarity.ms https://maps.googleapis.com https://api.emailjs.com https://www.googletagmanager.com https://scripts.clarity.ms 'sha256-+Ls1J3CNKRWCjh7heA/MbhOvlv+rsgEgUXfO0SgI828=' 'sha256-7XXmC1dn7iaFPmvqvGF9D9LDw53sjMdZTDenhCazFx0=' 'sha256-8ODoMrm9WR4+lDIz0uYjcXsBiwcQpoywMs/z0i1BhtI=' 'sha256-Sd0UVVK/2wO46OxLt0wFc9bkzsHhut6kFiXAiMZ2aWo=' 'sha256-VQAD+w17XTDzp9jU5G85eIP+rTZZHwFQA/14uQGPEVQ=' 'sha256-isJ6nefYY9jnuSKOEBmiO11IgwnzitZgrUfdbaMOifw=' 'sha256-mLK4codzPm0E95vJcOrFgjChuMwIA1BUn3H2skjE6yA='; script-src-attr 'unsafe-inline'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.clarity.ms https://maps.googleapis.com https://api.emailjs.com https://www.googletagmanager.com https://scripts.clarity.ms; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://education.studyleapbnl.workers.dev https://api.telegram.org https://api.emailjs.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://*.clarity.ms; frame-src https://maps.google.com; object-src 'none'; base-uri 'self'; script-src-elem 'self' https://cdn.jsdelivr.net https://www.clarity.ms https://maps.googleapis.com https://api.emailjs.com https://www.googletagmanager.com https://scripts.clarity.ms 'sha256-+Ls1J3CNKRWCjh7heA/MbhOvlv+rsgEgUXfO0SgI828=' 'sha256-7XXmC1dn7iaFPmvqvGF9D9LDw53sjMdZTDenhCazFx0=' 'sha256-8ODoMrm9WR4+lDIz0uYjcXsBiwcQpoywMs/z0i1BhtI=' 'sha256-Sd0UVVK/2wO46OxLt0wFc9bkzsHhut6kFiXAiMZ2aWo=' 'sha256-VQAD+w17XTDzp9jU5G85eIP+rTZZHwFQA/14uQGPEVQ=' 'sha256-m+Ws7zvUzNYytmtnWJeMFTSO2ulOrDGFMpLE7QghyD8=' 'sha256-mLK4codzPm0E95vJcOrFgjChuMwIA1BUn3H2skjE6yA='; script-src-attr 'unsafe-inline'">
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -51,7 +51,7 @@ img{max-width:100%;display:block;}
 .hero{background:linear-gradient(135deg,#0f2149 0%,#003A8C 50%,#0048A8 100%);padding:48px 5% 3rem;color:white;}
 
 
-.hero-dot{width:6px;height:6px;background:#10b981;border-radius:50%;animation:pulse 2s infinite;}
+.hero-dot{width:6px;height:6px;background:#10b981;border-radius:50%;animation:pulse 2s 4;}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.5;transform:scale(1.5);}}
 h1{font-size:clamp(1.8rem,3.5vw,2.7rem);line-height:1.2;margin-bottom:1rem;color:white;}
 h1 em{color:var(--gold);font-style:normal;}
@@ -1126,9 +1126,13 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 <!-- Tag ID: z0ihjnvf64 | Installed: May 2026 -->
 <script>
   (function(c,l,a,r,i,t,y){
-    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    function start(){ if(c.__clarityStarted) return; c.__clarityStarted=1;
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y); }
+    // start after the visitor first interacts, or after 10 s - keeps it off the critical page load
+    ['pointerdown','keydown','touchstart','scroll'].forEach(function(e){ addEventListener(e,start,{once:true,passive:true}); });
+    setTimeout(start,10000);
   })(window, document, "clarity", "script", "z0ihjnvf64");
 </script>
 <style>/* v6: stop iOS Safari zooming into form fields */@media (max-width:768px){input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]),select,textarea{font-size:16px !important}}</style>
@@ -1137,7 +1141,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 <nav class="navbar" role="navigation" aria-label="Main Navigation" id="navbar">
   <a href="#home" class="logo">
     <div class="logo-icon" style="background:#fff;padding:2px;">
-      <img src="/favicon-192.png" alt="Study LEAP logo" width="42" height="42" style="width:100%;height:100%;object-fit:contain;border-radius:50%;">
+      <img src="/logo-96.png" alt="Study LEAP logo" width="42" height="42" style="width:100%;height:100%;object-fit:contain;border-radius:50%;">
     </div>
     <div class="logo-wordmark">
       <div class="logo-text"><span class="sc-study">Study</span><span class="sc-capital"> LEAP</span></div>
@@ -1520,7 +1524,7 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
       <!-- Brand Column -->
       <div class="footer-brand">
         <div class="footer-logo">
-          <div class="footer-logo-icon" style="background:#fff;padding:1px;"><img src="/favicon-192.png" alt="Study LEAP logo" width="36" height="36" style="width:100%;height:100%;object-fit:contain;border-radius:50%;"></div>
+          <div class="footer-logo-icon" style="background:#fff;padding:1px;"><img src="/logo-96.png" alt="Study LEAP logo" width="36" height="36" style="width:100%;height:100%;object-fit:contain;border-radius:50%;"></div>
           <div>
             <div class="footer-logo-text" style="font-weight:700;">Study<span style="color:#FCD34D;">LEAP</span></div>
             <div style="font-size:0.58rem; letter-spacing:1.5px; text-transform:uppercase; color:rgba(255,255,255,0.48); margin-top:1px;">Education Loan Experts</div>

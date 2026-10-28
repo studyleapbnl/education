@@ -55,3 +55,14 @@ Save backup codes offline.
 Every page may run only its own inline <script> blocks. After you edit ANY inline script in ANY page, run
 `python3 tools/update-csp-hashes.py` before uploading (`--check` shows whether pages are stale). If you forget, that
 page's script is blocked and the page misbehaves. Inline `onclick="..."` attributes are still allowed.
+
+## 7. Performance notes (v7)
+* The home page used to keep the phone's processor busy with three large blurred, endlessly animated shapes (about 75%
+  of the main-thread work). They are now static on phones and when "reduce motion" is on; the badge dot pulses 4 times.
+* Microsoft Clarity starts on the visitor's first touch/scroll/key press (or after 10 s); Cloudflare Turnstile loads on
+  the first interaction with the page. Both used to load immediately. Very short visits may therefore not appear in
+  Clarity recordings - that is the trade-off.
+* app.js / reviews.js / api.js / ts-guard.js are loaded with a version number (?v=8). Whenever you edit one of those files,
+  change the number in the pages that load it, otherwise returning visitors keep the old copy for up to 6 months.
+* Header and footer logos now use /logo-96.png (1.5 KB) instead of the 23 KB favicon.
+* After deploying, re-run PageSpeed Insights (mobile) on the home page and compare.

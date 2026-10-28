@@ -5,7 +5,7 @@
  * Deploy this file to the web root: https://www.studyleap.in/sw.js
  */
 
-const CACHE_NAME    = 'studyleap-v7';
+const CACHE_NAME    = 'studyleap-v8';
 const OFFLINE_PAGE  = '/offline.html';
 
 // Static assets to pre-cache on install

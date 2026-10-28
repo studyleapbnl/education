@@ -8,7 +8,8 @@
 (function () {
   'use strict';
   var SITE_KEY = '0x4AAAAAAFgKteCHGoM2uIpw';
-  var HOSTS    = window.SL_API_HOSTS || ['https://education.studyleapbnl.workers.dev'];
+  // resolved at call time, so the load order of api.js and this file does not matter
+  function hosts() { return window.SL_API_HOSTS || ['https://api.studyleap.in', 'https://education.studyleapbnl.workers.dev']; }
   if (!window.fetch || window.__slTsGuard) return;
   window.__slTsGuard = true;
   var nativeFetch = window.fetch.bind(window);
@@ -80,9 +81,10 @@
 
   function needsToken(url, init) {
     if (!init || String(init.method || 'GET').toUpperCase() !== 'POST') return false;
-    for (var i = 0; i < HOSTS.length; i++) {
-      if (url.indexOf(HOSTS[i]) === 0) {
-        var path = url.slice(HOSTS[i].length).split('?')[0];
+    var H = hosts();
+    for (var i = 0; i < H.length; i++) {
+      if (url.indexOf(H[i]) === 0) {
+        var path = url.slice(H[i].length).split('?')[0];
         return path === '' || path === '/' || path === '/otp/send';
       }
     }

@@ -209,7 +209,7 @@ async function submitToWorker(emailParams, telegramMessage, turnstileToken = '')
 // ── Navbar scroll effect + back-to-top ──
 window.addEventListener('scroll', () => {
   document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 20);
-  });
+}, { passive: true });
 
 // ── Mobile menu ──
 function toggleMenu(e) {
@@ -368,14 +368,28 @@ function whenTurnstileReady(cb, attempts = 0) {
   if (attempts > 100) return; // ~10s ceiling, give up quietly
   setTimeout(() => whenTurnstileReady(cb, attempts + 1), 100);
 }
-if (TURNSTILE_SITE_KEY) whenTurnstileReady(() => {
+// Turnstile is loaded on the visitor's first interaction (or after 10 s) instead of at page load -
+// it is a third-party script and was delaying the first paint on phones.
+let turnstileLoading = false;
+function loadTurnstile() {
+  if (turnstileLoading || !TURNSTILE_SITE_KEY) return;
+  turnstileLoading = true;
+  const s = document.createElement('script');
+  s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+  s.async = true;
+  document.head.appendChild(s);
+  whenTurnstileReady(onTurnstileReady);
+}
+['pointerdown', 'keydown', 'touchstart', 'focusin'].forEach(ev => window.addEventListener(ev, loadTurnstile, { once: true, passive: true }));
+setTimeout(loadTurnstile, 10000);
+function onTurnstileReady() {
   turnstileApiReady = true;
   const cEl = document.getElementById('c-turnstile');
   if (cEl && cTurnstileWidgetId === null) {
     cTurnstileWidgetId = turnstile.render('#c-turnstile', { sitekey: TURNSTILE_SITE_KEY, theme: 'light' });
   }
   if (heroStep === 3) renderHeroTurnstile();
-});
+}
 function renderHeroTurnstile() {
   if (!turnstileApiReady || hTurnstileWidgetId !== null) return;
   const hEl = document.getElementById('h-turnstile');
