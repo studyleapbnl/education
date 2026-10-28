@@ -45,13 +45,11 @@ User-agent: Applebot-Extended
 Allow: /
 Disallow: /upload-documents/
 
-# Allow SEO crawlers with a crawl delay
+# SEO crawlers
 User-agent: AhrefsBot
-Crawl-delay: 10
 Allow: /
 
 User-agent: SemrushBot
-Crawl-delay: 10
 Allow: /
 
 # Sitemap
