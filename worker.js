@@ -850,7 +850,10 @@ async function handleFormSubmit(request, env, origin) {
   return json({ ok: true, id: lead.id, errors, whatsapp: waResult.results || null }, 200, origin);
 }
 
-// ── IndexNow ping ─────────────────────────────────────────────────────────
+// ── IndexNow ping ──────────────────────────────────
+// POST /indexnow  (header X-CRM-Secret)   body: { "urls": ["https://studyleap.in/..."] }
+//                                          or { "all": true }  -> submits every URL in the sitemap
+const INDEXNOW_HOST = 'studyleap.in';
 async function handleIndexNow(request, env, origin) {
   if (!authOk(request, env))
     return json({ ok: false, error: 'Unauthorized' }, 401, origin);
@@ -858,29 +861,36 @@ async function handleIndexNow(request, env, origin) {
   if (!env.INDEXNOW_KEY)
     return json({ ok: false, error: 'INDEXNOW_KEY secret not configured' }, 500, origin);
 
-  let body;
-  try { body = await request.json(); }
-  catch { return json({ ok: false, error: 'Invalid JSON body' }, 400, origin); }
+  const parsed = await readJsonLimited(request);
+  if (!parsed.ok) return json({ ok: false, error: 'Invalid JSON body' }, parsed.status, origin);
+  const body = parsed.data && typeof parsed.data === 'object' ? parsed.data : {};
 
-  const urls = Array.isArray(body.urls) ? body.urls.slice(0, 10000) : [];
+  let urls = Array.isArray(body.urls) ? body.urls.slice(0, 10000) : [];
+  if (body.all === true) {
+    try {
+      const sm = await fetch(`https://${INDEXNOW_HOST}/sitemap.xml`, { signal: AbortSignal.timeout(10000) });
+      const xml = await sm.text();
+      urls = [...xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map(m => m[1]);
+    } catch (err) {
+      return json({ ok: false, error: 'Could not read sitemap: ' + err.message }, 502, origin);
+    }
+  }
   if (!urls.length)
-    return json({ ok: false, error: 'Provide at least one URL in the "urls" array' }, 400, origin);
+    return json({ ok: false, error: 'Provide a "urls" array or {"all": true}' }, 400, origin);
 
-  const invalidUrls = urls.filter(u => {
-    try { return !ALLOWED_ORIGINS.some(o => u.startsWith(o)); }
-    catch { return true; }
-  });
+  // IndexNow requires every URL to be on the declared host
+  const invalidUrls = urls.filter(u => typeof u !== 'string' || !u.startsWith(`https://${INDEXNOW_HOST}/`) && u !== `https://${INDEXNOW_HOST}`);
   if (invalidUrls.length)
-    return json({ ok: false, error: 'All URLs must be on studyleap.in', invalidUrls }, 400, origin);
+    return json({ ok: false, error: `All URLs must start with https://${INDEXNOW_HOST}/`, invalidUrls: invalidUrls.slice(0, 20) }, 400, origin);
 
   try {
     const res = await fetch('https://api.indexnow.org/indexnow', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify({
-        host:        'www.studyleap.in',
+        host:        INDEXNOW_HOST,
         key:         env.INDEXNOW_KEY,
-        keyLocation: `https://www.studyleap.in/${env.INDEXNOW_KEY}.txt`,
+        keyLocation: `https://${INDEXNOW_HOST}/${env.INDEXNOW_KEY}.txt`,
         urlList:     urls,
       }),
       signal: AbortSignal.timeout(10000),

@@ -66,3 +66,9 @@ page's script is blocked and the page misbehaves. Inline `onclick="..."` attribu
   change the number in the pages that load it, otherwise returning visitors keep the old copy for up to 6 months.
 * Header and footer logos now use /logo-96.png (1.5 KB) instead of the 23 KB favicon.
 * After deploying, re-run PageSpeed Insights (mobile) on the home page and compare.
+
+## 8. Canonical address (v9)
+The preferred address is **https://studyleap.in/** (no www). The live site already redirects www to it; every page, the
+sitemap, robots.txt, llms.txt, schema, e-mails and IndexNow now use it. Keep it that way: if you ever change the hosting or
+the redirect, the redirect and the `<link rel="canonical">` on the pages must point to the same address.
+See docs/SEO-PLAN.md for the SEO checklist.

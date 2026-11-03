@@ -2,10 +2,10 @@
  * Study LEAP — Service Worker v1.0
  * Strategy: Cache-first for static assets, Network-first for pages
  * ─────────────────────────────────────────────────────────────────
- * Deploy this file to the web root: https://www.studyleap.in/sw.js
+ * Deploy this file to the web root: https://studyleap.in/sw.js
  */
 
-const CACHE_NAME    = 'studyleap-v8';
+const CACHE_NAME    = 'studyleap-v9';
 const OFFLINE_PAGE  = '/offline.html';
 
 // Static assets to pre-cache on install

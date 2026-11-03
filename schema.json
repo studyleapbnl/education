@@ -2,12 +2,12 @@
   {
     "@context": "https://schema.org",
     "@type": "FinancialService",
-    "@id": "https://www.studyleap.in/#corporate",
+    "@id": "https://studyleap.in/#corporate",
     "name": "Study LEAP \u2013 Education Loan Consultant",
     "alternateName": ["Study LEAP", "Study LEAP India", "Study LEAP Education Loans"],
-    "image": ["https://www.studyleap.in/og-image.jpg"],
-    "logo": "https://www.studyleap.in/logo.png",
-    "url": "https://www.studyleap.in",
+    "image": ["https://studyleap.in/og-image.jpg"],
+    "logo": "https://studyleap.in/logo.png",
+    "url": "https://studyleap.in",
     "sameAs": ["https://www.facebook.com/profile.php?id=61590689732654", "https://www.instagram.com/studyleapeducationloan/"],
     "telephone": "+918837693510",
     "email": "support@studyleap.in",
@@ -54,41 +54,41 @@
       "@type": "OfferCatalog",
       "name": "Education Loan Services",
       "itemListElement": [
-        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "USA Education Loan", "url": "https://www.studyleap.in/education-loan-usa/"}},
-        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Canada Education Loan", "url": "https://www.studyleap.in/education-loan-canada/"}},
-        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "UK Education Loan", "url": "https://www.studyleap.in/education-loan-uk/"}},
-        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Australia Education Loan", "url": "https://www.studyleap.in/education-loan-australia/"}},
-        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Germany Education Loan", "url": "https://www.studyleap.in/education-loan-germany/"}},
-        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "IIT Education Loan", "url": "https://www.studyleap.in/education-loan-for-iit/"}},
-        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "MBBS Education Loan", "url": "https://www.studyleap.in/education-loan-for-mbbs/"}},
-        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Education Loan Without Collateral", "url": "https://www.studyleap.in/education-loan-without-collateral/"}}
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "USA Education Loan", "url": "https://studyleap.in/education-loan-usa/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Canada Education Loan", "url": "https://studyleap.in/education-loan-canada/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "UK Education Loan", "url": "https://studyleap.in/education-loan-uk/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Australia Education Loan", "url": "https://studyleap.in/education-loan-australia/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Germany Education Loan", "url": "https://studyleap.in/education-loan-germany/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "IIT Education Loan", "url": "https://studyleap.in/education-loan-for-iit/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "MBBS Education Loan", "url": "https://studyleap.in/education-loan-for-mbbs/"}},
+        {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Education Loan Without Collateral", "url": "https://studyleap.in/education-loan-without-collateral/"}}
       ]
     }
   },
   {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "@id": "https://www.studyleap.in/#website",
-    "url": "https://www.studyleap.in",
+    "@id": "https://studyleap.in/#website",
+    "url": "https://studyleap.in",
     "name": "Study LEAP",
     "description": "India's trusted education loan consultant \u2014 free guidance for domestic and international education loans.",
-    "publisher": {"@id": "https://www.studyleap.in/#corporate"},
+    "publisher": {"@id": "https://studyleap.in/#corporate"},
     "potentialAction": {
       "@type": "SearchAction",
-      "target": {"@type": "EntryPoint", "urlTemplate": "https://www.studyleap.in/?s={search_term_string}"},
+      "target": {"@type": "EntryPoint", "urlTemplate": "https://studyleap.in/?s={search_term_string}"},
       "query-input": "required name=search_term_string"
     }
   },
   {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    "@id": "https://www.studyleap.in/#breadcrumb",
+    "@id": "https://studyleap.in/#breadcrumb",
     "itemListElement": [
       {
         "@type": "ListItem",
         "position": 1,
         "name": "Home",
-        "item": "https://www.studyleap.in/"
+        "item": "https://studyleap.in/"
       }
     ]
   }

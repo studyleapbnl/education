@@ -317,7 +317,7 @@ function handleSendSummary(data) {
         '<tr><td style="padding:32px 40px;text-align:center;border-top:1px solid #e2e8f0;margin-top:28px;">' +
         '<p style="margin:0;color:#94a3b8;font-size:13px;line-height:1.6;">' +
         'Study LEAP | Education Loan Specialists<br>' +
-        '<a href="https://www.studyleap.in" style="color:#0048A8;text-decoration:none;">www.studyleap.in</a> | ' +
+        '<a href="https://studyleap.in" style="color:#0048A8;text-decoration:none;">studyleap.in</a> | ' +
         '<a href="mailto:support@studyleap.in" style="color:#0048A8;text-decoration:none;">support@studyleap.in</a>' +
         '</p>' +
         '<p style="margin:14px 0 0;color:#94a3b8;font-size:11px;line-height:1.5;">You received this because documents were submitted on studyleap.in using this e-mail address. If that was not you, please ignore this message or write to support@studyleap.in.</p>' +
@@ -335,7 +335,7 @@ function handleSendSummary(data) {
         'Loan Amount: ' + (si.amount || '') + '\n\n' +
         'Our team will contact you within 24-48 hours.\n\n' +
         'WhatsApp: +91 88376 93510\n' +
-        'Team Study LEAP | www.studyleap.in\n\n' +
+        'Team Study LEAP | studyleap.in\n\n' +
         'You received this because documents were submitted on studyleap.in using this e-mail address. If that was not you, please ignore this message.',
         { htmlBody: htmlBody }
       );
