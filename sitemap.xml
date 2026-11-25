@@ -12,7 +12,7 @@
   <!-- TIER 1 — Homepage -->
   <url>
     <loc>https://studyleap.in/</loc>
-    <lastmod>2026-10-30</lastmod>
+    <lastmod>2026-11-25</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <xhtml:link rel="alternate" hreflang="en-IN" href="https://studyleap.in/"/>
@@ -34,31 +34,16 @@
   <url><loc>https://studyleap.in/resources/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
 
   <!-- TIER 3 — Local city pages (existing) -->
-  <url><loc>https://studyleap.in/education-loan-prayagraj/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
   <url><loc>https://studyleap.in/education-loan-zirakpur/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
 
   <!-- TIER 3b — City pages -->
-  <url><loc>https://studyleap.in/education-loan-mumbai/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-bangalore/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-hyderabad/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-chennai/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-pune/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-kolkata/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-ahmedabad/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-jaipur/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-lucknow/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
   <url><loc>https://studyleap.in/education-loan-chandigarh/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-punjab/</loc><lastmod>2026-10-30</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://studyleap.in/education-loan-punjab/</loc><lastmod>2026-11-25</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://studyleap.in/education-loan-haryana/</loc><lastmod>2026-11-25</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
+  <url><loc>https://studyleap.in/education-loan-himachal-pradesh/</loc><lastmod>2026-11-25</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
   <url><loc>https://studyleap.in/education-loan-barnala/</loc><lastmod>2026-10-30</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-noida/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-gurgaon/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
 
   <!-- TIER 3c — Tier-2 city pages -->
-  <url><loc>https://studyleap.in/education-loan-patna/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-varanasi/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-indore/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-bhopal/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
-  <url><loc>https://studyleap.in/education-loan-nagpur/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.85</priority></url>
 
   <!-- TIER 4 — Country + topic pages -->
   <url><loc>https://studyleap.in/education-loan-usa/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
@@ -79,7 +64,6 @@
   <!-- TIER 4c — Course/topic pages -->
   <url><loc>https://studyleap.in/education-loan-for-mba/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://studyleap.in/education-loan-for-engineering/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://studyleap.in/education-loan-moratorium-period/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://studyleap.in/education-loan-for-girls/</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
 
   <!-- TIER 5 — Bank pages -->

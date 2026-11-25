@@ -16,6 +16,9 @@
  *     auto-reply email is limited to 1 per address per 24 h; sub-1.5s form fills are dropped.
  *   - Turnstile now also protects /otp/send. TURNSTILE_REQUIRED="true" = strict (token mandatory,
  *     verification errors block); unset = monitor mode (failures are logged, never block).
+ *   v6.2: every website lead is also sent to the CRM (pushToCrm -> crm.studyleap.in
+ *     /api/webhooks/website-leads, header x-api-key = Worker secret CRM_LEADS_KEY), in the
+ *     background. The form response no longer includes WhatsApp send results (phone numbers).
  *   v6.1: only whitelisted form fields are accepted (others dropped); Telegram/WhatsApp alert text is
  *     built on the server (client text ignored); public endpoints reject bodies over 32 KB (413).
  *   Optional variables: WHATSAPP_OTP_TEMPLATE (default studyleap_otp2), WHATSAPP_LEAD_TEMPLATE,
@@ -469,7 +472,7 @@ async function sendTelegram(env, message) {
 
 // ── Router ─────────────────────────────────────────────────────────────────
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url    = new URL(request.url);
     const method = request.method;
     const origin = request.headers.get('Origin') || '';
@@ -483,7 +486,7 @@ export default {
     // POST / — form submission (check CORS origin first)
     if (method === 'POST' && url.pathname === '/') {
       if (!requestOriginAllowed(request)) return json({ ok: false, error: 'Forbidden' }, 403, origin);
-      return handleFormSubmit(request, env, origin);
+      return handleFormSubmit(request, env, origin, ctx);
     }
 
     // POST /otp/send, /otp/verify - server-side OTP for the document-upload page
@@ -655,7 +658,7 @@ async function handleFollowUpReminders(env) {
 }
 
 // ── Form submission ────────────────────────────────────────────────────────
-async function handleFormSubmit(request, env, origin) {
+async function handleFormSubmit(request, env, origin, ctx) {
   const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
 
   if (await isRateLimited(clientIP, env.DB))
@@ -745,6 +748,15 @@ async function handleFormSubmit(request, env, origin) {
   } catch (err) {
     console.error('D1 insert error:', err.message);
     errors.push('db_error: ' + err.message);
+  }
+
+  // ── 5b. Send the lead to the Study LEAP CRM (v6.2) ───────────────────────
+  // Runs in the background: the visitor gets their answer straight away, and a
+  // slow or broken CRM can never fail the form. B2B partner enquiries are skipped
+  // (they are not students).
+  if (!emailParams['Business Name']) {
+    const push = pushToCrm(env, lead, emailParams);
+    if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(push); else await push;
   }
 
   // ── 6/7. WhatsApp + Telegram — sent independently, in parallel ───────────
@@ -847,7 +859,56 @@ async function handleFormSubmit(request, env, origin) {
     }
   }
 
-  return json({ ok: true, id: lead.id, errors, whatsapp: waResult.results || null }, 200, origin);
+  // v6.2: the WhatsApp send results (which contain the alert phone numbers) are no longer returned.
+  return json({ ok: true, id: lead.id, errors }, 200, origin);
+}
+
+// ── CRM push (v6.2) ────────────────────────────────────────────────────────
+// POSTs the lead to the CRM's /api/webhooks/website-leads with the shared key in
+// the x-api-key header. The key is the Worker SECRET CRM_LEADS_KEY (same value as
+// WEBSITE_LEADS_KEY on the CRM). It is only ever used here, on the server.
+// Optional variable CRM_LEADS_URL overrides the default address.
+const CRM_LEADS_URL_DEFAULT = 'https://crm.studyleap.in/api/webhooks/website-leads';
+
+async function pushToCrm(env, lead, p) {
+  if (!env.CRM_LEADS_KEY) { console.warn(`[Lead ${lead.id}] CRM push SKIPPED - CRM_LEADS_KEY not set`); return; }
+  const email = (lead.email && EMAIL_RE.test(lead.email)) ? lead.email : '';
+  const details = [
+    p['Source']      ? `Form: ${p['Source']}`             : '',
+    lead.loanType    ? `Loan type: ${lead.loanType}`      : '',
+    lead.loanAmount  ? `Loan amount: ${lead.loanAmount}`  : '',
+    lead.city        ? `City: ${lead.city}`               : '',
+    lead.message     ? `Message: ${lead.message}`         : '',
+  ].filter(Boolean).join('\n');
+  const payload = {
+    leadId:  lead.id,                          // a retry with the same id is not saved twice
+    name:    lead.name,
+    phone:   lead.phone,
+    email,
+    country: lead.destination || undefined,
+    course:  lead.course || undefined,
+    message: details.slice(0, 2000) || undefined,
+    page:    'https://studyleap.in/',
+    notify:  false,                            // this Worker already sends the alerts
+  };
+  const url = env.CRM_LEADS_URL || CRM_LEADS_URL_DEFAULT;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': env.CRM_LEADS_KEY },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(10000),
+      });
+      const text = (await res.text().catch(() => '')).slice(0, 300);
+      if (res.ok) { console.log(`[Lead ${lead.id}] CRM push OK: ${text}`); return; }
+      console.error(`[Lead ${lead.id}] CRM push FAILED: HTTP ${res.status} ${text}`);
+      if (res.status < 500) return;            // 400/401/404 will not fix themselves on a retry
+    } catch (err) {
+      console.error(`[Lead ${lead.id}] CRM push FAILED (attempt ${attempt}):`, err.message);
+    }
+    if (attempt === 1) await new Promise(r => setTimeout(r, 1500));
+  }
 }
 
 // ── IndexNow ping ──────────────────────────────────
@@ -1104,6 +1165,7 @@ async function handleAdminStatus(request, env) {
     config: {
       otpSecretSet: has(env.OTP_SECRET),
       crmSecretSet: has(env.CRM_SECRET),
+      crmLeadsKeySet: has(env.CRM_LEADS_KEY),
       turnstile: { secretSet: has(env.TURNSTILE_SECRET), mode: strict ? 'strict' : 'monitor' },
       whatsapp: {
         configured: has(env.WHATSAPP_TOKEN) && has(env.WHATSAPP_PHONE_ID),
